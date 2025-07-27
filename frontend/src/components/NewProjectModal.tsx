@@ -1,0 +1,673 @@
+import React, { useState, useEffect } from 'react';
+import { Project, ProjectPayment, InternalStaff, ExternalStaff, OpexItem, HRMaster } from '../types/ppe';
+
+interface NewProjectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (project: Partial<Project>) => void;
+}
+
+// 임시 HR 마스터 데이터
+const hrMaster: HRMaster[] = [
+  { hrId: 1, name: '윤승현', monthlyCost: 23391667 },
+  { hrId: 2, name: '박영훈', monthlyCost: 16783333 },
+];
+
+const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSave }) => {
+  const [formData, setFormData] = useState<Partial<Project>>({
+    name: '',
+    client: '',
+    startDate: '',
+    endDate: '',
+    pm: '',
+    contractValue: 0,
+    status: '계획'
+  });
+
+  const [payment, setPayment] = useState<ProjectPayment>({
+    downPayment: 0,
+    middlePayment: 0,
+    finalPayment: 0
+  });
+
+  const [paymentPercent, setPaymentPercent] = useState({
+    down: 30,
+    middle: 40,
+    final: 30
+  });
+
+  const [internalStaff, setInternalStaff] = useState<InternalStaff[]>([]);
+  const [externalStaff, setExternalStaff] = useState<ExternalStaff[]>([]);
+  const [indirectOpex, setIndirectOpex] = useState<OpexItem[]>([]);
+  const [directOpex, setDirectOpex] = useState<OpexItem[]>([]);
+
+  useEffect(() => {
+    calculatePayment();
+  }, [formData.contractValue, paymentPercent]);
+
+  const calculatePayment = () => {
+    const total = formData.contractValue || 0;
+    setPayment({
+      downPayment: total * (paymentPercent.down / 100),
+      middlePayment: total * (paymentPercent.middle / 100),
+      finalPayment: total * (paymentPercent.final / 100)
+    });
+  };
+
+  const calculateStaffCost = (staff: InternalStaff): number => {
+    if (!staff.startDate || !staff.endDate) return 0;
+    
+    const hr = hrMaster.find(h => h.hrId === staff.hrId);
+    if (!hr) return 0;
+
+    const start = new Date(staff.startDate);
+    const end = new Date(staff.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const workingDays = diffDays - staff.exclusionDays;
+    const months = (workingDays / 30.4) * (staff.utilization / 100);
+    
+    return months * hr.monthlyCost;
+  };
+
+  const addInternalStaff = () => {
+    setInternalStaff([...internalStaff, {
+      hrId: hrMaster[0].hrId,
+      name: hrMaster[0].name,
+      role: '',
+      startDate: '',
+      endDate: '',
+      utilization: 100,
+      exclusionDays: 0,
+      totalCost: 0
+    }]);
+  };
+
+  const updateInternalStaff = (index: number, field: keyof InternalStaff, value: any) => {
+    const updated = [...internalStaff];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    if (field === 'hrId') {
+      const hr = hrMaster.find(h => h.hrId === value);
+      if (hr) {
+        updated[index].name = hr.name;
+        updated[index].monthlyCost = hr.monthlyCost;
+      }
+    }
+    
+    updated[index].totalCost = calculateStaffCost(updated[index]);
+    setInternalStaff(updated);
+  };
+
+  const removeInternalStaff = (index: number) => {
+    setInternalStaff(internalStaff.filter((_, i) => i !== index));
+  };
+
+  const addExternalStaff = () => {
+    setExternalStaff([...externalStaff, {
+      name: '',
+      role: '',
+      contact: '',
+      period: '',
+      cost: 0,
+      memo: ''
+    }]);
+  };
+
+  const updateExternalStaff = (index: number, field: keyof ExternalStaff, value: any) => {
+    const updated = [...externalStaff];
+    updated[index] = { ...updated[index], [field]: value };
+    setExternalStaff(updated);
+  };
+
+  const removeExternalStaff = (index: number) => {
+    setExternalStaff(externalStaff.filter((_, i) => i !== index));
+  };
+
+  const addOpexItem = (type: 'indirect' | 'direct') => {
+    const newItem: OpexItem = { category: '', amount: 0, note: '' };
+    if (type === 'indirect') {
+      setIndirectOpex([...indirectOpex, newItem]);
+    } else {
+      setDirectOpex([...directOpex, newItem]);
+    }
+  };
+
+  const updateOpexItem = (type: 'indirect' | 'direct', index: number, field: keyof OpexItem, value: any) => {
+    const items = type === 'indirect' ? [...indirectOpex] : [...directOpex];
+    items[index] = { ...items[index], [field]: value };
+    
+    if (type === 'indirect') {
+      setIndirectOpex(items);
+    } else {
+      setDirectOpex(items);
+    }
+  };
+
+  const removeOpexItem = (type: 'indirect' | 'direct', index: number) => {
+    if (type === 'indirect') {
+      setIndirectOpex(indirectOpex.filter((_, i) => i !== index));
+    } else {
+      setDirectOpex(directOpex.filter((_, i) => i !== index));
+    }
+  };
+
+  const formatCurrency = (num: number) => {
+    return new Intl.NumberFormat('ko-KR').format(Math.round(num));
+  };
+
+  const handleSave = () => {
+    // TODO: 프로젝트와 함께 PPE 데이터도 저장
+    onSave(formData);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center">
+      <div 
+        className="absolute inset-0 bg-black bg-opacity-40"
+        onClick={onClose}
+      ></div>
+      <div className="w-full max-w-7xl bg-white rounded-xl shadow-2xl relative z-50 flex flex-col h-[90vh]">
+        <header className="p-4 border-b border-slate-200">
+          <h3 className="font-bold text-lg">새 프로젝트 추가</h3>
+        </header>
+        <div className="flex-1 overflow-y-auto p-6 text-sm">
+          <div className="space-y-6">
+            {/* 기본 정보 */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div className="md:col-span-2">
+                <label className="block font-medium text-slate-600 mb-1">프로젝트명</label>
+                <input 
+                  type="text" 
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block font-medium text-slate-600 mb-1">시작일</label>
+                <input 
+                  type="date" 
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block font-medium text-slate-600 mb-1">종료일</label>
+                <input 
+                  type="date" 
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block font-medium text-slate-600 mb-1">거래처</label>
+                <input 
+                  type="text" 
+                  value={formData.client}
+                  onChange={(e) => setFormData({...formData, client: e.target.value})}
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block font-medium text-slate-600 mb-1">담당 PM</label>
+                <select 
+                  value={formData.pm}
+                  onChange={(e) => setFormData({...formData, pm: e.target.value})}
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                >
+                  <option value="">선택</option>
+                  {hrMaster.map(hr => (
+                    <option key={hr.hrId} value={hr.name}>{hr.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block font-medium text-slate-600 mb-1">계약금액</label>
+                <input 
+                  type="number" 
+                  value={formData.contractValue}
+                  onChange={(e) => setFormData({...formData, contractValue: parseInt(e.target.value) || 0})}
+                  placeholder="총 계약금액(원)"
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block font-medium text-slate-600 mb-1">상태</label>
+                <select 
+                  value={formData.status}
+                  onChange={(e) => setFormData({...formData, status: e.target.value as '진행중' | '완료' | '계획'})}
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                >
+                  <option value="계획">계획</option>
+                  <option value="진행중">진행중</option>
+                  <option value="완료">완료</option>
+                </select>
+              </div>
+            </section>
+
+            {/* 계약금 관리 */}
+            <section className="space-y-2">
+              <label className="block font-medium text-slate-600">계약금 관리</label>
+              <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-md items-center">
+                <span>계약금</span>
+                <input type="date" className="w-full p-1 border rounded-md" />
+                <div className="flex items-center">
+                  <input 
+                    type="number" 
+                    value={paymentPercent.down}
+                    onChange={(e) => setPaymentPercent({...paymentPercent, down: parseInt(e.target.value) || 0})}
+                    className="w-16 p-1 border rounded-md"
+                  />
+                  <span className="ml-1">%</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={formatCurrency(payment.downPayment)}
+                  className="w-full p-1 border rounded-md bg-slate-200"
+                  readOnly
+                />
+              </div>
+              <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-md items-center">
+                <span>중도금</span>
+                <input type="date" className="w-full p-1 border rounded-md" />
+                <div className="flex items-center">
+                  <input 
+                    type="number" 
+                    value={paymentPercent.middle}
+                    onChange={(e) => setPaymentPercent({...paymentPercent, middle: parseInt(e.target.value) || 0})}
+                    className="w-16 p-1 border rounded-md"
+                  />
+                  <span className="ml-1">%</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={formatCurrency(payment.middlePayment)}
+                  className="w-full p-1 border rounded-md bg-slate-200"
+                  readOnly
+                />
+              </div>
+              <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-md items-center">
+                <span>잔금</span>
+                <input type="date" className="w-full p-1 border rounded-md" />
+                <div className="flex items-center">
+                  <input 
+                    type="number" 
+                    value={paymentPercent.final}
+                    onChange={(e) => setPaymentPercent({...paymentPercent, final: parseInt(e.target.value) || 0})}
+                    className="w-16 p-1 border rounded-md"
+                  />
+                  <span className="ml-1">%</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={formatCurrency(payment.finalPayment)}
+                  className="w-full p-1 border rounded-md bg-slate-200"
+                  readOnly
+                />
+              </div>
+            </section>
+
+            {/* 투입인력 */}
+            <section>
+              <label className="block font-medium text-slate-600">투입인력</label>
+              <div className="mt-1 border rounded-lg overflow-x-auto">
+                <table className="w-full min-w-[1000px]">
+                  <thead className="bg-slate-50 text-xs text-slate-500">
+                    <tr className="text-left">
+                      <th className="p-2 font-medium">이름</th>
+                      <th className="p-2 font-medium">담당업무</th>
+                      <th className="p-2 font-medium">투입시작일</th>
+                      <th className="p-2 font-medium">투입종료일</th>
+                      <th className="p-2 font-medium">투입율(%)</th>
+                      <th className="p-2 font-medium">투입제외일(일)</th>
+                      <th className="p-2 font-medium text-right">총 투입원가</th>
+                      <th className="w-12 p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {internalStaff.map((staff, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="p-1">
+                          <select 
+                            value={staff.hrId}
+                            onChange={(e) => updateInternalStaff(index, 'hrId', parseInt(e.target.value))}
+                            className="w-full border-0 rounded-md"
+                          >
+                            {hrMaster.map(hr => (
+                              <option key={hr.hrId} value={hr.hrId}>{hr.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={staff.role}
+                            onChange={(e) => updateInternalStaff(index, 'role', e.target.value)}
+                            placeholder="담당업무"
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="date" 
+                            value={staff.startDate}
+                            onChange={(e) => updateInternalStaff(index, 'startDate', e.target.value)}
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="date" 
+                            value={staff.endDate}
+                            onChange={(e) => updateInternalStaff(index, 'endDate', e.target.value)}
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="number" 
+                            value={staff.utilization}
+                            onChange={(e) => updateInternalStaff(index, 'utilization', parseInt(e.target.value) || 0)}
+                            className="w-full border-0 rounded-md text-right"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="number" 
+                            value={staff.exclusionDays}
+                            onChange={(e) => updateInternalStaff(index, 'exclusionDays', parseInt(e.target.value) || 0)}
+                            className="w-full border-0 rounded-md text-right"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={formatCurrency(staff.totalCost)}
+                            className="w-full border-0 rounded-md bg-slate-100 text-right"
+                            readOnly
+                          />
+                        </td>
+                        <td className="p-1 text-center">
+                          <button 
+                            type="button" 
+                            onClick={() => removeInternalStaff(index)}
+                            className="text-slate-400 hover:text-rose-500"
+                          >
+                            &times;
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button 
+                  type="button" 
+                  onClick={addInternalStaff}
+                  className="w-full text-center p-2 text-indigo-600 hover:bg-indigo-50"
+                >
+                  + 인력 추가
+                </button>
+              </div>
+            </section>
+
+            {/* 외부인력 */}
+            <section>
+              <label className="block font-medium text-slate-600">외부인력 (프리랜서)</label>
+              <div className="mt-1 border rounded-lg overflow-x-auto">
+                <table className="w-full min-w-[1000px]">
+                  <thead className="bg-slate-50 text-xs text-slate-500">
+                    <tr className="text-left">
+                      <th className="p-2 font-medium">이름</th>
+                      <th className="p-2 font-medium">담당업무</th>
+                      <th className="p-2 font-medium">연락처</th>
+                      <th className="p-2 font-medium">투입기간</th>
+                      <th className="p-2 font-medium">외주금액</th>
+                      <th className="p-2 font-medium">메모</th>
+                      <th className="p-2 font-medium">첨부서류</th>
+                      <th className="w-12 p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {externalStaff.map((staff, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={staff.name}
+                            onChange={(e) => updateExternalStaff(index, 'name', e.target.value)}
+                            placeholder="이름"
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={staff.role}
+                            onChange={(e) => updateExternalStaff(index, 'role', e.target.value)}
+                            placeholder="담당업무"
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={staff.contact}
+                            onChange={(e) => updateExternalStaff(index, 'contact', e.target.value)}
+                            placeholder="연락처"
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={staff.period}
+                            onChange={(e) => updateExternalStaff(index, 'period', e.target.value)}
+                            placeholder="YYYY.MM.DD ~ YYYY.MM.DD"
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="number" 
+                            value={staff.cost}
+                            onChange={(e) => updateExternalStaff(index, 'cost', parseInt(e.target.value) || 0)}
+                            placeholder="금액"
+                            className="w-full border-0 rounded-md text-right"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={staff.memo}
+                            onChange={(e) => updateExternalStaff(index, 'memo', e.target.value)}
+                            placeholder="메모"
+                            className="w-full border-0 rounded-md"
+                          />
+                        </td>
+                        <td className="p-1 text-center">
+                          <button type="button" className="text-xs text-indigo-600 hover:underline">
+                            파일첨부
+                          </button>
+                        </td>
+                        <td className="p-1 text-center">
+                          <button 
+                            type="button" 
+                            onClick={() => removeExternalStaff(index)}
+                            className="text-slate-400 hover:text-rose-500"
+                          >
+                            &times;
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button 
+                  type="button" 
+                  onClick={addExternalStaff}
+                  className="w-full text-center p-2 text-indigo-600 hover:bg-indigo-50"
+                >
+                  + 외부인력 추가
+                </button>
+              </div>
+            </section>
+
+            {/* Opex */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block font-medium text-slate-600">Indirect Opex</label>
+                <div className="mt-1 border rounded-lg">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 text-xs text-slate-500">
+                      <tr className="text-left">
+                        <th className="p-2 font-medium">항목</th>
+                        <th className="p-2 font-medium">금액</th>
+                        <th className="p-2 font-medium">비고</th>
+                        <th className="w-12 p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {indirectOpex.map((item, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="p-1">
+                            <input 
+                              type="text" 
+                              value={item.category}
+                              onChange={(e) => updateOpexItem('indirect', index, 'category', e.target.value)}
+                              placeholder="항목명"
+                              className="w-full border-0 rounded-md"
+                            />
+                          </td>
+                          <td className="p-1">
+                            <input 
+                              type="number" 
+                              value={item.amount}
+                              onChange={(e) => updateOpexItem('indirect', index, 'amount', parseInt(e.target.value) || 0)}
+                              placeholder="금액"
+                              className="w-full border-0 rounded-md text-right"
+                            />
+                          </td>
+                          <td className="p-1">
+                            <input 
+                              type="text" 
+                              value={item.note}
+                              onChange={(e) => updateOpexItem('indirect', index, 'note', e.target.value)}
+                              placeholder="비고"
+                              className="w-full border-0 rounded-md"
+                            />
+                          </td>
+                          <td className="p-1 text-center">
+                            <button 
+                              type="button" 
+                              onClick={() => removeOpexItem('indirect', index)}
+                              className="text-slate-400 hover:text-rose-500"
+                            >
+                              &times;
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button 
+                    type="button" 
+                    onClick={() => addOpexItem('indirect')}
+                    className="w-full text-center p-2 text-indigo-600 hover:bg-indigo-50"
+                  >
+                    + 항목 추가
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block font-medium text-slate-600">Direct Opex</label>
+                <div className="mt-1 border rounded-lg">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 text-xs text-slate-500">
+                      <tr className="text-left">
+                        <th className="p-2 font-medium">항목</th>
+                        <th className="p-2 font-medium">금액</th>
+                        <th className="p-2 font-medium">비고</th>
+                        <th className="w-12 p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {directOpex.map((item, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="p-1">
+                            <input 
+                              type="text" 
+                              value={item.category}
+                              onChange={(e) => updateOpexItem('direct', index, 'category', e.target.value)}
+                              placeholder="항목명"
+                              className="w-full border-0 rounded-md"
+                            />
+                          </td>
+                          <td className="p-1">
+                            <input 
+                              type="number" 
+                              value={item.amount}
+                              onChange={(e) => updateOpexItem('direct', index, 'amount', parseInt(e.target.value) || 0)}
+                              placeholder="금액"
+                              className="w-full border-0 rounded-md text-right"
+                            />
+                          </td>
+                          <td className="p-1">
+                            <input 
+                              type="text" 
+                              value={item.note}
+                              onChange={(e) => updateOpexItem('direct', index, 'note', e.target.value)}
+                              placeholder="비고"
+                              className="w-full border-0 rounded-md"
+                            />
+                          </td>
+                          <td className="p-1 text-center">
+                            <button 
+                              type="button" 
+                              onClick={() => removeOpexItem('direct', index)}
+                              className="text-slate-400 hover:text-rose-500"
+                            >
+                              &times;
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button 
+                    type="button" 
+                    onClick={() => addOpexItem('direct')}
+                    className="w-full text-center p-2 text-indigo-600 hover:bg-indigo-50"
+                  >
+                    + 항목 추가
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+        <footer className="p-4 bg-slate-50 flex justify-end space-x-2">
+          <button 
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+          >
+            취소
+          </button>
+          <button 
+            onClick={handleSave}
+            className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          >
+            저장
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+export default NewProjectModal;
