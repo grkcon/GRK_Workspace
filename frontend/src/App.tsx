@@ -12,9 +12,10 @@ import './App.css';
 
 function App() {
   const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID';
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // 임시로 true로 설정
 
-  if (!isAuthenticated) {
+  // 개발 환경에서는 로그인 우회
+  if (!isAuthenticated && process.env.NODE_ENV === 'production') {
     return (
       <div className="App">
         <LoginWithCustomButton 

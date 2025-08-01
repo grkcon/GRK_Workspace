@@ -7,7 +7,59 @@ interface EmployeeFormProps {
   mode: 'view' | 'edit' | 'new';
 }
 
+export const getEmployeeFormData = (): any => {
+  const form = document.getElementById('employee-form') as HTMLFormElement;
+  if (!form) return null;
+  
+  const formData = new FormData(form);
+  
+  const data: any = {
+    empNo: formData.get('empNo') as string,
+    name: formData.get('name') as string,
+    position: formData.get('position') as string,
+    rank: formData.get('rank') as string,
+    department: formData.get('department') as string,
+    tel: formData.get('tel') as string,
+    email: formData.get('email') as string,
+    age: parseInt(formData.get('age') as string) || 0,
+    joinDate: formData.get('joinDate') as string,
+    endDate: formData.get('endDate') as string || undefined,
+    monthlySalary: parseInt(formData.get('monthlySalary') as string) || 0,
+    status: 'ACTIVE',
+    ssn: formData.get('ssn') as string,
+    bankAccount: formData.get('bankAccount') as string,
+  };
+
+  // 학력 정보 수집
+  const educationRows = document.querySelectorAll('#education-container tbody tr');
+  data.education = Array.from(educationRows).map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {
+      school: inputs[0]?.value || '',
+      major: inputs[1]?.value || '',
+      degree: inputs[2]?.value || '',
+      graduationYear: new Date().getFullYear()
+    };
+  }).filter(edu => edu.school || edu.major || edu.degree);
+
+  // 경력 정보 수집
+  const experienceRows = document.querySelectorAll('#experience-container tbody tr');
+  data.experience = Array.from(experienceRows).map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {
+      company: inputs[0]?.value || '',
+      description: inputs[1]?.value || '',
+      position: inputs[2]?.value || '',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: new Date().toISOString().split('T')[0]
+    };
+  }).filter(exp => exp.company || exp.position);
+
+  return data;
+};
+
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }) => {
+
   const addEducation = () => {
     const tbody = document.querySelector('#education-container tbody');
     const template = document.querySelector('#education-template') as HTMLTemplateElement;
@@ -61,8 +113,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }
             <label className="block font-medium text-slate-600 mb-1">사번</label>
             <input
               type="text"
-              name="emp_no"
-              defaultValue={employee?.emp_no || ''}
+              name="empNo"
+              defaultValue={employee?.empNo || ''}
               readOnly={!isEditing}
               className={inputClass}
             />
@@ -83,6 +135,36 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }
               type="text"
               name="department"
               defaultValue={employee?.department || ''}
+              readOnly={!isEditing}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block font-medium text-slate-600 mb-1">직책</label>
+            <input
+              type="text"
+              name="rank"
+              defaultValue={employee?.rank || ''}
+              readOnly={!isEditing}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block font-medium text-slate-600 mb-1">전화번호</label>
+            <input
+              type="text"
+              name="tel"
+              defaultValue={employee?.tel || ''}
+              readOnly={!isEditing}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block font-medium text-slate-600 mb-1">나이</label>
+            <input
+              type="number"
+              name="age"
+              defaultValue={employee?.age?.toString() || ''}
               readOnly={!isEditing}
               className={inputClass}
             />
@@ -108,11 +190,11 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }
             />
           </div>
           <div>
-            <label className="block font-medium text-slate-600 mb-1">연봉</label>
+            <label className="block font-medium text-slate-600 mb-1">월급</label>
             <input
               type="text"
-              name="salary"
-              defaultValue={employee?.salary || ''}
+              name="monthlySalary"
+              defaultValue={employee?.monthlySalary?.toString() || ''}
               readOnly={!isEditing}
               className={inputClass}
             />
@@ -121,8 +203,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }
             <label className="block font-medium text-slate-600 mb-1">입사일</label>
             <input
               type="date"
-              name="join_date"
-              defaultValue={employee?.join_date || ''}
+              name="joinDate"
+              defaultValue={employee?.joinDate ? new Date(employee.joinDate).toISOString().split('T')[0] : ''}
               readOnly={!isEditing}
               className={inputClass}
             />
@@ -131,8 +213,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }
             <label className="block font-medium text-slate-600 mb-1">퇴사일</label>
             <input
               type="date"
-              name="end_date"
-              defaultValue={employee?.end_date || ''}
+              name="endDate"
+              defaultValue={employee?.endDate ? new Date(employee.endDate).toISOString().split('T')[0] : ''}
               readOnly={!isEditing}
               className={inputClass}
             />
@@ -141,8 +223,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }
             <label className="block font-medium text-slate-600 mb-1">계좌번호</label>
             <input
               type="text"
-              name="bank_account"
-              defaultValue={employee?.bank_account || ''}
+              name="bankAccount"
+              defaultValue={employee?.bankAccount || ''}
               readOnly={!isEditing}
               className={inputClass}
             />
@@ -277,7 +359,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, isEditing, mode }
                   <td className="p-1">
                     <input
                       type="text"
-                      defaultValue={exp.department}
+                      defaultValue={exp.description}
                       readOnly={!isEditing}
                       className="w-full border-0 rounded-md"
                     />

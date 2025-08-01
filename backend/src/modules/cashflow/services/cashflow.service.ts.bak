@@ -1,0 +1,181 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CashFlow, MonthlyFlow } from '../../../entities';
+import { CreateCashFlowDto, UpdateCashFlowDto } from '../dto';
+import { CashFlowCalculator } from '../calculators/cashflow.calculator';
+
+@Injectable()
+export class CashFlowService {
+  constructor(
+    @InjectRepository(CashFlow)
+    private cashFlowRepository: Repository<CashFlow>,
+    @InjectRepository(MonthlyFlow)
+    private monthlyFlowRepository: Repository<MonthlyFlow>,
+    private cashFlowCalculator: CashFlowCalculator,
+  ) {}
+
+  async create(createCashFlowDto: CreateCashFlowDto): Promise<CashFlow> {
+    const cashFlow = this.cashFlowRepository.create({
+      year: createCashFlowDto.year,
+      projectName: createCashFlowDto.projectName,
+      client: createCashFlowDto.client,
+    });
+
+    // 월별 현금흐름 생성 및 계산
+    const monthlyFlows = await this.createMonthlyFlows(
+      createCashFlowDto.monthlyFlows,
+      cashFlow
+    );
+    cashFlow.monthlyFlows = monthlyFlows;
+
+    // 총합 계산
+    this.calculateTotals(cashFlow);
+
+    return this.cashFlowRepository.save(cashFlow);
+  }
+
+  async findAll(): Promise<CashFlow[]> {
+    return this.cashFlowRepository.find({
+      relations: ['monthlyFlows'],
+      order: { year: 'DESC' },
+    });
+  }
+
+  async findOne(id: number): Promise<CashFlow> {
+    const cashFlow = await this.cashFlowRepository.findOne({
+      where: { id },
+      relations: ['monthlyFlows'],
+    });
+
+    if (!cashFlow) {
+      throw new NotFoundException(`CashFlow with ID ${id} not found`);
+    }
+
+    return cashFlow;
+  }
+
+  async findByYear(year: number): Promise<CashFlow[]> {
+    return this.cashFlowRepository.find({
+      where: { year },
+      relations: ['monthlyFlows'],
+      order: { projectName: 'ASC' },
+    });
+  }
+
+  async update(id: number, updateCashFlowDto: UpdateCashFlowDto): Promise<CashFlow> {
+    const cashFlow = await this.findOne(id);
+
+    Object.assign(cashFlow, {
+      projectName: updateCashFlowDto.projectName || cashFlow.projectName,
+      client: updateCashFlowDto.client || cashFlow.client,
+    });
+
+    if (updateCashFlowDto.monthlyFlows) {
+      // 기존 월별 데이터 삭제
+      await this.monthlyFlowRepository.delete({ cashFlow: { id } });
+      
+      // 새로운 월별 데이터 생성
+      const newFlows = await this.createMonthlyFlows(
+        updateCashFlowDto.monthlyFlows,
+        cashFlow
+      );
+      cashFlow.monthlyFlows = newFlows;
+    }
+
+    // 총합 재계산
+    this.calculateTotals(cashFlow);
+
+    return this.cashFlowRepository.save(cashFlow);
+  }
+
+  async remove(id: number): Promise<void> {
+    const cashFlow = await this.findOne(id);
+    await this.cashFlowRepository.softDelete(id);
+  }
+
+  async calculateMonthlyCashFlow(year: number, month: number): Promise<any> {
+    const cashFlows = await this.findByYear(year);
+    
+    let totalBeginningCash = 0;
+    let totalRevenue = 0;
+    let totalExpense = 0;
+    let totalEndingCash = 0;
+
+    for (const cashFlow of cashFlows) {
+      const targetFlow = cashFlow.monthlyFlows.find(flow => flow.month === month);
+      if (targetFlow) {
+        totalBeginningCash += targetFlow.beginningCash;
+        totalRevenue += targetFlow.revenue;
+        totalExpense += targetFlow.expense;
+        totalEndingCash += targetFlow.endingCash;
+      }
+    }
+
+    return {
+      year,
+      month,
+      totalBeginningCash,
+      totalRevenue,
+      totalExpense,
+      totalEndingCash,
+      projects: cashFlows.map(cf => ({
+        projectName: cf.projectName,
+        monthlyFlow: cf.monthlyFlows.find(flow => flow.month === month),
+      })),
+    };
+  }
+
+  private async createMonthlyFlows(
+    monthlyFlowsDto: any[],
+    cashFlow: CashFlow
+  ): Promise<MonthlyFlow[]> {
+    const resultFlows: MonthlyFlow[] = [];
+    let previousEndingCash = 0;
+
+    // 월별로 정렬 (1월부터 12월까지)
+    const sortedFlows = monthlyFlowsDto.sort((a, b) => a.month - b.month);
+
+    for (const flowDto of sortedFlows) {
+      const flowEntity = this.monthlyFlowRepository.create({
+        ...flowDto,
+        cashFlow,
+        beginningCash: flowDto.month === 1 ? flowDto.beginningCash || 0 : previousEndingCash,
+      });
+
+      // 지출 계산
+      flowEntity.expense = this.cashFlowCalculator.calculateMonthlyExpense(
+        flowEntity.laborCost,
+        flowEntity.indirectOpex,
+        flowEntity.directOpex,
+        flowEntity.bonus
+      );
+
+      // 기말현금 계산 (엑셀 공식: =G7+G35-G8)
+      flowEntity.endingCash = this.cashFlowCalculator.calculateEndingCash(
+        flowEntity.beginningCash,
+        flowEntity.revenue + flowEntity.researchRevenue,
+        flowEntity.expense
+      );
+
+      previousEndingCash = flowEntity.endingCash;
+      resultFlows.push(flowEntity);
+    }
+
+    return resultFlows;
+  }
+
+  private calculateTotals(cashFlow: CashFlow): void {
+    const monthlyFlows = cashFlow.monthlyFlows;
+    
+    cashFlow.totalRevenue = this.cashFlowCalculator.calculateAnnualTotal(
+      monthlyFlows.map(flow => flow.revenue + flow.researchRevenue)
+    );
+    
+    cashFlow.totalExpense = this.cashFlowCalculator.calculateAnnualTotal(
+      monthlyFlows.map(flow => flow.expense)
+    );
+    
+    cashFlow.netCashFlow = cashFlow.totalRevenue - cashFlow.totalExpense;
+  }
+}

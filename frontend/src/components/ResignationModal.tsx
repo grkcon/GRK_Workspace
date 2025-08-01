@@ -10,6 +10,7 @@ interface ResignationModalProps {
 
 export interface ResignationRequestData {
   resignDate: string;
+  endDate: string;
   reason: string;
   leaveAccrued: number;
   leaveUsed: number;
@@ -22,6 +23,7 @@ export interface ResignationRequestData {
 const ResignationModal: React.FC<ResignationModalProps> = ({ isOpen, onClose, employee, onSubmit }) => {
   const [formData, setFormData] = useState<ResignationRequestData>({
     resignDate: '',
+    endDate: '',
     reason: '',
     leaveAccrued: 15,
     leaveUsed: 10,
@@ -44,9 +46,13 @@ const ResignationModal: React.FC<ResignationModalProps> = ({ isOpen, onClose, em
   }, [formData.leaveAccrued, formData.leaveUsed]);
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    onSubmit({
+      ...formData,
+      endDate: formData.resignDate
+    });
     setFormData({
       resignDate: '',
+      endDate: '',
       reason: '',
       leaveAccrued: 15,
       leaveUsed: 10,
@@ -77,7 +83,7 @@ const ResignationModal: React.FC<ResignationModalProps> = ({ isOpen, onClose, em
             </div>
             <div>
               <label className="block font-medium text-slate-500">사번</label>
-              <p className="mt-1 font-semibold">{employee?.emp_no}</p>
+              <p className="mt-1 font-semibold">{employee?.empNo}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

@@ -47,7 +47,7 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ isOpen, onClose, employee, on
             </div>
             <div>
               <label className="block font-medium text-slate-500">사번</label>
-              <p className="mt-1 font-semibold">{employee?.emp_no}</p>
+              <p className="mt-1 font-semibold">{employee?.empNo}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
