@@ -19,7 +19,9 @@ export class HRCostService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${createHRCostDto.employeeId} not found`);
+      throw new NotFoundException(
+        `Employee with ID ${createHRCostDto.employeeId} not found`,
+      );
     }
 
     const hrCost = this.hrCostRepository.create({
@@ -50,7 +52,10 @@ export class HRCostService {
     return hrCost;
   }
 
-  async findByEmployeeAndYear(employeeId: number, year: number): Promise<HRUnitCost> {
+  async findByEmployeeAndYear(
+    employeeId: number,
+    year: number,
+  ): Promise<HRUnitCost> {
     const hrCost = await this.hrCostRepository.findOne({
       where: { employee: { id: employeeId }, year },
       relations: ['employee'],
@@ -58,7 +63,7 @@ export class HRCostService {
 
     if (!hrCost) {
       throw new NotFoundException(
-        `HR Cost for employee ${employeeId} and year ${year} not found`
+        `HR Cost for employee ${employeeId} and year ${year} not found`,
       );
     }
 
@@ -73,16 +78,24 @@ export class HRCostService {
     });
   }
 
-  async update(id: number, updateHRCostDto: UpdateHRCostDto): Promise<HRUnitCost> {
+  async update(
+    id: number,
+    updateHRCostDto: UpdateHRCostDto,
+  ): Promise<HRUnitCost> {
     const hrCost = await this.findOne(id);
 
-    if (updateHRCostDto.employeeId && updateHRCostDto.employeeId !== hrCost.employee.id) {
+    if (
+      updateHRCostDto.employeeId &&
+      updateHRCostDto.employeeId !== hrCost.employee.id
+    ) {
       const employee = await this.employeeRepository.findOne({
         where: { id: updateHRCostDto.employeeId },
       });
 
       if (!employee) {
-        throw new NotFoundException(`Employee with ID ${updateHRCostDto.employeeId} not found`);
+        throw new NotFoundException(
+          `Employee with ID ${updateHRCostDto.employeeId} not found`,
+        );
       }
 
       hrCost.employee = employee;
@@ -121,12 +134,24 @@ export class HRCostService {
 
     return {
       totalAnnualSalary: hrCosts.reduce((sum, hr) => sum + hr.annualSalary, 0),
-      totalSocialInsurance: hrCosts.reduce((sum, hr) => sum + hr.socialInsurance, 0),
-      totalRetirementPension: hrCosts.reduce((sum, hr) => sum + hr.retirementPension, 0),
-      totalCompanyBurden: hrCosts.reduce((sum, hr) => sum + hr.companyBurden, 0),
+      totalSocialInsurance: hrCosts.reduce(
+        (sum, hr) => sum + hr.socialInsurance,
+        0,
+      ),
+      totalRetirementPension: hrCosts.reduce(
+        (sum, hr) => sum + hr.retirementPension,
+        0,
+      ),
+      totalCompanyBurden: hrCosts.reduce(
+        (sum, hr) => sum + hr.companyBurden,
+        0,
+      ),
       totalMonthlyCost: hrCosts.reduce((sum, hr) => sum + hr.monthlyCost, 0),
       totalBonus: hrCosts.reduce((sum, hr) => sum + hr.bonus, 0),
-      totalFixedLaborCost: hrCosts.reduce((sum, hr) => sum + hr.fixedLaborCost, 0),
+      totalFixedLaborCost: hrCosts.reduce(
+        (sum, hr) => sum + hr.fixedLaborCost,
+        0,
+      ),
     };
   }
 }

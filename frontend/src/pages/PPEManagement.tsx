@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Project, ProjectPPE as ProjectPPEFromTypes } from '../types/ppe';
+import { ProjectPPE as ProjectPPEFromTypes } from '../types/ppe';
 import { Project as BackendProject, projectApi, ProjectStatus } from '../services/projectApi';
+import { ppeApi } from '../services/ppeApi';
 import PPEDetailPanel from '../components/PPEDetailPanel';
 import NewProjectModal from '../components/NewProjectModal';
 
@@ -52,16 +53,123 @@ const PPEManagement: React.FC = () => {
     setSelectedProject(undefined);
   };
 
-  const handleSavePPE = (updatedData: ProjectPPEFromTypes) => {
-    setPpeDataMap(prev => {
-      const newMap = new Map(prev);
-      // updatedData.project?.id를 사용하거나, project가 없으면 id를 직접 사용
-      const projectId = updatedData.project?.id || updatedData.id;
-      if (projectId) {
-        newMap.set(projectId, updatedData);
+  const handleSavePPE = async (updatedData: ProjectPPEFromTypes) => {
+    try {
+      if (selectedProject) {
+        console.log('Attempting to save PPE data for project:', selectedProject.id, updatedData);
+        
+        // PPE 데이터 준비 (백엔드 API에 맞는 형식으로)
+        const ppePayload = {
+          revenue: updatedData.revenue || 0,
+          laborCost: updatedData.laborCost || 0,
+          outsourcingCost: updatedData.outsourcingCost || 0,
+          opexCost: updatedData.opexCost || 0,
+          grossIncome: updatedData.grossIncome || 0,
+          grossIncomeRate: updatedData.grossIncomeRate || 0,
+          operationIncome: updatedData.operationIncome || 0,
+          operationIncomeRate: updatedData.operationIncomeRate || 0,
+          profit: updatedData.profit || 0,
+          profitRate: updatedData.profitRate || 0,
+          // OPEX 데이터만 포함 (indirectOpex, directOpex)
+          indirectOpex: (updatedData.indirectOpex || []).map(item => ({
+            category: item.category || '',
+            amount: item.amount || 0,
+            note: item.note || ''
+          })),
+          directOpex: (updatedData.directOpex || []).map(item => ({
+            category: item.category || '',
+            amount: item.amount || 0,
+            note: item.note || ''
+          }))
+        };
+        
+        console.log('PPE payload:', ppePayload);
+        
+        let savedPPE;
+        
+        // 먼저 해당 프로젝트의 PPE 데이터가 있는지 서버에서 확인
+        try {
+          const existingPPE = await ppeApi.getByProjectId(selectedProject.id);
+          console.log('Existing PPE found:', existingPPE);
+          
+          // 기존 PPE 데이터가 있고 ID가 유효한 경우에만 업데이트
+          if (existingPPE && existingPPE.id && existingPPE.id > 0) {
+            savedPPE = await ppeApi.update(existingPPE.id, ppePayload);
+            console.log('PPE data updated:', savedPPE);
+          } else {
+            // 기존 PPE 데이터가 없거나 ID가 유효하지 않은 경우 새로 생성
+            console.log('Invalid existing PPE ID, creating new one');
+            savedPPE = await ppeApi.create(selectedProject.id, ppePayload);
+            console.log('New PPE data created:', savedPPE);
+          }
+          
+        } catch (notFoundError) {
+          console.log('No existing PPE found, creating new one');
+          
+          // 새로운 PPE 데이터 생성
+          savedPPE = await ppeApi.create(selectedProject.id, ppePayload);
+          console.log('New PPE data created:', savedPPE);
+        }
+        
+        // 프로젝트 관련 데이터 저장 (internal staff, external staff, payment)
+        // TODO: 별도 API가 필요하다면 여기서 처리
+        if (updatedData.internalStaff || updatedData.externalStaff || updatedData.payment) {
+          console.log('Additional project data to save:', {
+            internalStaff: updatedData.internalStaff,
+            externalStaff: updatedData.externalStaff,
+            payment: updatedData.payment
+          });
+          
+          // 프로젝트 업데이트 (payment, staff 정보 포함)
+          try {
+            await projectApi.update(selectedProject.id, {
+              projectPayment: updatedData.payment ? {
+                downPayment: updatedData.payment.downPayment || 0,
+                middlePayment: updatedData.payment.middlePayment || 0,
+                finalPayment: updatedData.payment.finalPayment || 0
+              } : undefined,
+              internalStaff: updatedData.internalStaff ? updatedData.internalStaff.map(staff => ({
+                name: staff.name,
+                role: staff.role,
+                startDate: staff.startDate,
+                endDate: staff.endDate,
+                utilization: staff.utilization,
+                exclusionDays: staff.exclusionDays,
+                totalCost: staff.totalCost,
+                monthlyCost: staff.monthlyCost
+              })) : undefined,
+              externalStaff: updatedData.externalStaff ? updatedData.externalStaff.map(staff => ({
+                name: staff.name,
+                role: staff.role,
+                contact: staff.contact,
+                period: staff.period,
+                cost: staff.cost,
+                memo: staff.memo
+              })) : undefined
+            });
+            console.log('Project data updated with staff and payment info');
+          } catch (projectUpdateError) {
+            console.warn('Failed to update project data:', projectUpdateError);
+            // PPE는 저장되었으므로 경고만 표시
+          }
+        }
+        
+        // 로컬 상태 업데이트
+        setPpeDataMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(selectedProject.id, updatedData);
+          return newMap;
+        });
+        
+        // 프로젝트 목록 새로고침
+        await fetchProjects();
+        
+        alert('저장되었습니다.');
       }
-      return newMap;
-    });
+    } catch (error) {
+      console.error('Failed to save PPE data:', error);
+      alert('저장에 실패했습니다: ' + (error as Error).message);
+    }
   };
 
   const handleSaveNewProject = async (newProject: any) => {

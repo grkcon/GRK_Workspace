@@ -10,24 +10,23 @@ export enum OpexType {
 
 export enum OpexRelationshipType {
   MONTHLY_OPEX = 'monthly_opex',
-  PPE_INDIRECT = 'ppe_indirect', 
+  PPE_INDIRECT = 'ppe_indirect',
   PPE_DIRECT = 'ppe_direct',
 }
 
 @Entity('opex_items')
 export class OpexItem extends BaseEntity {
-
   @Column({ type: 'varchar', length: 100 })
   category: string; // 항목
 
-  @Column({ 
-    type: 'decimal', 
-    precision: 15, 
+  @Column({
+    type: 'decimal',
+    precision: 15,
     scale: 0,
     transformer: {
       to: (value: number) => value,
-      from: (value: string) => parseFloat(value)
-    }
+      from: (value: string) => parseFloat(value),
+    },
   })
   amount: number; // 금액
 

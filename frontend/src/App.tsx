@@ -9,6 +9,11 @@ import OpexManagement from './pages/OpexManagement';
 import PPEManagement from './pages/PPEManagement';
 import Schedule from './pages/Schedule';
 import AttendanceManagement from './pages/AttendanceManagement';
+import EvaluationManagement from './pages/EvaluationManagement';
+import EvaluationPersonal from './pages/EvaluationPersonal';
+import CRManagement from './pages/CRManagement';
+import AttendanceAdmin from './pages/AttendanceAdmin';
+import ScheduleAdmin from './pages/ScheduleAdmin';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
@@ -35,6 +40,11 @@ function App() {
                       <Route path="/ppe" element={<PPEManagement />} />
                       <Route path="/opex" element={<OpexManagement />} />
                       <Route path="/attendance" element={<AttendanceManagement />} />
+                      <Route path="/evaluation" element={<EvaluationManagement />} />
+                      <Route path="/evaluation-personal" element={<EvaluationPersonal />} />
+                      <Route path="/cr" element={<CRManagement />} />
+                      <Route path="/attendance-admin" element={<AttendanceAdmin />} />
+                      <Route path="/schedule-admin" element={<ScheduleAdmin />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </div>

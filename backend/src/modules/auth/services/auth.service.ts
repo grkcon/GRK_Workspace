@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -21,23 +25,25 @@ export class AuthService {
 
   async googleAuth(googleAuthDto: GoogleAuthDto): Promise<AuthResponseDto> {
     let googleUser: any;
-    
+
     try {
       // Access Token으로 Google API에서 사용자 정보 가져오기
       const response = await fetch(
-        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${googleAuthDto.accessToken}`
+        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${googleAuthDto.accessToken}`,
       );
-      
+
       if (!response.ok) {
         throw new UnauthorizedException('Invalid Google token');
       }
 
       const userInfo = await response.json();
       console.log('Google User Info:', userInfo); // 디버깅용
-      
+
       // 도메인 검증
       if (!userInfo.email?.endsWith('@grkcon.com')) {
-        throw new ForbiddenException('grkcon.com 도메인 이메일만 로그인 가능합니다.');
+        throw new ForbiddenException(
+          'grkcon.com 도메인 이메일만 로그인 가능합니다.',
+        );
       }
 
       googleUser = {
@@ -56,14 +62,14 @@ export class AuthService {
 
     // 이메일 ID 기반 권한 결정 (실제 이메일 사용)
     const emailPrefix = googleUser.email.split('@')[0].toLowerCase();
-    const role = ['admin', 'ceo'].includes(emailPrefix) 
-      ? UserRole.ADMIN 
+    const role = ['admin', 'ceo'].includes(emailPrefix)
+      ? UserRole.ADMIN
       : UserRole.EMPLOYEE;
-    
+
     console.log('Email prefix:', emailPrefix);
     console.log('Assigned role:', role);
 
-    let user = await this.userRepository.findOne({
+    const user = await this.userRepository.findOne({
       where: { email: googleUser.email },
     });
 

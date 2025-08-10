@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Project, ProjectPayment, InternalStaff, ExternalStaff, OpexItem, HRMaster } from '../types/ppe';
+import { Project, ProjectPayment, InternalStaff, ExternalStaff, OpexItem } from '../types/ppe';
+import { employeeApi } from '../services/employeeApi';
+import { Employee } from '../types/employee';
 
 interface NewProjectModalProps {
   isOpen: boolean;
@@ -7,13 +9,10 @@ interface NewProjectModalProps {
   onSave: (project: Partial<Project>) => void;
 }
 
-// 임시 HR 마스터 데이터
-const hrMaster: HRMaster[] = [
-  { hrId: 1, name: '윤승현', monthlyCost: 23391667 },
-  { hrId: 2, name: '박영훈', monthlyCost: 16783333 },
-];
 
 const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSave }) => {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [formData, setFormData] = useState<Partial<Project>>({
     name: '',
     client: '',
@@ -41,6 +40,27 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
   const [indirectOpex, setIndirectOpex] = useState<OpexItem[]>([]);
   const [directOpex, setDirectOpex] = useState<OpexItem[]>([]);
 
+  // 재직자 리스트 가져오기
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      if (isOpen) {
+        setLoadingEmployees(true);
+        try {
+          const activeEmployees = await employeeApi.getActive();
+          setEmployees(activeEmployees);
+        } catch (error) {
+          console.error('Failed to fetch employees:', error);
+          // 실패 시 기존 hrMaster 사용
+          setEmployees([]);
+        } finally {
+          setLoadingEmployees(false);
+        }
+      }
+    };
+
+    fetchEmployees();
+  }, [isOpen]);
+
   useEffect(() => {
     calculatePayment();
   }, [formData.contractValue, paymentPercent]);
@@ -54,11 +74,35 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
     });
   };
 
+  const updatePayment = (field: keyof ProjectPayment, value: number) => {
+    setPayment({
+      ...payment,
+      [field]: value
+    });
+  };
+
   const calculateStaffCost = (staff: InternalStaff): number => {
     if (!staff.startDate || !staff.endDate) return 0;
     
-    const hr = hrMaster.find(h => h.hrId === staff.hrId);
-    if (!hr) return 0;
+    // 실제 직원 데이터에서 찾기
+    const employee = employees.find(emp => emp.id === staff.hrId);
+    let monthlyCost = 0;
+    
+    if (employee) {
+      // HR Cost에서 월 인력비 가져오기 (현재 연도 기준)
+      const currentYear = new Date().getFullYear();
+      const hrCost = employee.hrCosts?.find(cost => cost.year === currentYear);
+      
+      if (hrCost && hrCost.monthlyLaborCost) {
+        monthlyCost = hrCost.monthlyLaborCost;
+      } else if (employee.monthlySalary) {
+        // HR Cost가 없으면 기존 월급 사용
+        monthlyCost = employee.monthlySalary;
+      }
+    }
+    
+
+    if (monthlyCost === 0) return 0;
 
     const start = new Date(staff.startDate);
     const end = new Date(staff.endDate);
@@ -67,20 +111,53 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
     const workingDays = diffDays - staff.exclusionDays;
     const months = (workingDays / 30.4) * (staff.utilization / 100);
     
-    return months * hr.monthlyCost;
+    return months * monthlyCost;
   };
 
   const addInternalStaff = () => {
-    setInternalStaff([...internalStaff, {
-      hrId: hrMaster[0].hrId,
-      name: hrMaster[0].name,
-      role: '',
-      startDate: '',
-      endDate: '',
-      utilization: 100,
-      exclusionDays: 0,
-      totalCost: 0
-    }]);
+    if (employees.length > 0) {
+      const firstEmployee = employees[0];
+      setInternalStaff([...internalStaff, {
+        hrId: firstEmployee.id,
+        name: firstEmployee.name,
+        role: '',
+        startDate: '',
+        endDate: '',
+        utilization: 100,
+        exclusionDays: 0,
+        totalCost: 0
+      }]);
+    }
+  };
+
+  // 투입율 자동 계산 함수
+  const calculateUtilization = (startDate: string, endDate: string, exclusionDays: number): number => {
+    if (!startDate || !endDate) return 100;
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // 주말을 제외한 영업일 계산
+    let totalWorkDays = 0;
+    const current = new Date(start);
+    
+    while (current <= end) {
+      const dayOfWeek = current.getDay();
+      // 주말(토요일:6, 일요일:0)을 제외
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        totalWorkDays++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    
+    // 투입제외일을 뺀 실제 투입일수
+    const actualWorkDays = totalWorkDays - exclusionDays;
+    
+    // 투입율 = (실제 투입일수 / 전체 영업일수) * 100
+    const utilization = totalWorkDays > 0 ? (actualWorkDays / totalWorkDays) * 100 : 100;
+    
+    // 0보다 작거나 100보다 큰 값 방지
+    return Math.max(0, Math.min(100, Math.round(utilization * 100) / 100));
   };
 
   const updateInternalStaff = (index: number, field: keyof InternalStaff, value: any) => {
@@ -88,13 +165,37 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
     updated[index] = { ...updated[index], [field]: value };
     
     if (field === 'hrId') {
-      const hr = hrMaster.find(h => h.hrId === value);
-      if (hr) {
-        updated[index].name = hr.name;
-        updated[index].monthlyCost = hr.monthlyCost;
+      // 실제 직원 데이터에서 찾기
+      const employee = employees.find(emp => emp.id === value);
+      if (employee) {
+        updated[index].name = employee.name;
+        
+        // HR Cost에서 월 인력비 가져오기 (현재 연도 기준)
+        const currentYear = new Date().getFullYear();
+        const hrCost = employee.hrCosts?.find(cost => cost.year === currentYear);
+        
+        if (hrCost && hrCost.monthlyLaborCost) {
+          updated[index].monthlyCost = hrCost.monthlyLaborCost;
+        } else if (employee.monthlySalary) {
+          // HR Cost가 없으면 기존 월급 사용
+          updated[index].monthlyCost = employee.monthlySalary;
+        } else {
+          updated[index].monthlyCost = 0;
+        }
       }
     }
     
+    // 날짜나 제외일이 변경되면 투입율 자동 계산
+    if (field === 'startDate' || field === 'endDate' || field === 'exclusionDays') {
+      const { startDate, endDate, exclusionDays } = updated[index];
+      updated[index].utilization = calculateUtilization(
+        startDate, 
+        endDate, 
+        exclusionDays || 0
+      );
+    }
+    
+    // 투입율, 날짜, 제외일, 직원 변경 시 총 투입원가 자동 재계산
     updated[index].totalCost = calculateStaffCost(updated[index]);
     setInternalStaff(updated);
   };
@@ -156,10 +257,52 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
     return new Intl.NumberFormat('ko-KR').format(Math.round(num));
   };
 
-  const handleSave = () => {
-    // TODO: 프로젝트와 함께 PPE 데이터도 저장
-    onSave(formData);
+  const resetData = () => {
+    setFormData({
+      name: '',
+      client: '',
+      startDate: '',
+      endDate: '',
+      pm: '',
+      contractValue: 0,
+      status: '계획'
+    });
+    setPayment({ downPayment: 0, middlePayment: 0, finalPayment: 0 });
+    setPaymentPercent({ down: 30, middle: 40, final: 30 });
+    setInternalStaff([]);
+    setExternalStaff([]);
+    setIndirectOpex([]);
+    setDirectOpex([]);
+  };
+
+  const handleClose = () => {
+    resetData();
     onClose();
+  };
+
+  const handleSave = () => {
+    // 완전한 프로젝트 데이터 구성
+    const projectData = {
+      ...formData,
+      projectPayment: payment,
+      internalStaff: internalStaff.map(staff => ({
+        name: staff.name,
+        role: staff.role,
+        startDate: staff.startDate,
+        endDate: staff.endDate,
+        utilization: staff.utilization,
+        exclusionDays: staff.exclusionDays,
+        totalCost: staff.totalCost,
+        monthlyCost: staff.monthlyCost,
+        employeeId: staff.hrId // 직원 ID 매핑
+      })),
+      externalStaff: externalStaff,
+      indirectOpex: indirectOpex,
+      directOpex: directOpex
+    };
+    
+    onSave(projectData);
+    handleClose();
   };
 
   if (!isOpen) return null;
@@ -168,7 +311,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
     <div className="fixed inset-0 z-30">
       <div 
         className="absolute inset-0 bg-black bg-opacity-20"
-        onClick={onClose}
+        onClick={handleClose}
       ></div>
       <div className={`absolute top-0 right-0 h-full w-full max-w-5xl bg-white shadow-2xl flex flex-col transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <header className="p-4 border-b border-slate-200">
@@ -222,8 +365,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
                   className="w-full p-2 border border-slate-300 rounded-md"
                 >
                   <option value="">선택</option>
-                  {hrMaster.map(hr => (
-                    <option key={hr.hrId} value={hr.name}>{hr.name}</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.name}>{emp.name}</option>
                   ))}
                 </select>
               </div>
@@ -267,10 +410,11 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
                   <span className="ml-1">%</span>
                 </div>
                 <input 
-                  type="text" 
-                  value={formatCurrency(payment.downPayment)}
-                  className="w-full p-1 border rounded-md bg-slate-200"
-                  readOnly
+                  type="number" 
+                  value={payment.downPayment}
+                  onChange={(e) => updatePayment('downPayment', parseInt(e.target.value) || 0)}
+                  className="w-full p-1 border rounded-md"
+                  placeholder="금액"
                 />
               </div>
               <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-md items-center">
@@ -286,10 +430,11 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
                   <span className="ml-1">%</span>
                 </div>
                 <input 
-                  type="text" 
-                  value={formatCurrency(payment.middlePayment)}
-                  className="w-full p-1 border rounded-md bg-slate-200"
-                  readOnly
+                  type="number" 
+                  value={payment.middlePayment}
+                  onChange={(e) => updatePayment('middlePayment', parseInt(e.target.value) || 0)}
+                  className="w-full p-1 border rounded-md"
+                  placeholder="금액"
                 />
               </div>
               <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-md items-center">
@@ -305,10 +450,11 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
                   <span className="ml-1">%</span>
                 </div>
                 <input 
-                  type="text" 
-                  value={formatCurrency(payment.finalPayment)}
-                  className="w-full p-1 border rounded-md bg-slate-200"
-                  readOnly
+                  type="number" 
+                  value={payment.finalPayment}
+                  onChange={(e) => updatePayment('finalPayment', parseInt(e.target.value) || 0)}
+                  className="w-full p-1 border rounded-md"
+                  placeholder="금액"
                 />
               </div>
             </section>
@@ -339,9 +485,17 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
                             onChange={(e) => updateInternalStaff(index, 'hrId', parseInt(e.target.value))}
                             className="w-full border-0 rounded-md"
                           >
-                            {hrMaster.map(hr => (
-                              <option key={hr.hrId} value={hr.hrId}>{hr.name}</option>
-                            ))}
+                            {loadingEmployees ? (
+                              <option>로딩 중...</option>
+                            ) : (
+                              <>
+                                {employees.map(emp => (
+                                  <option key={emp.id} value={emp.id}>
+                                    {emp.name} ({emp.empNo}) - {emp.position}
+                                  </option>
+                                ))}
+                              </>
+                            )}
                           </select>
                         </td>
                         <td className="p-1">
@@ -373,8 +527,10 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
                           <input 
                             type="number" 
                             value={staff.utilization}
-                            onChange={(e) => updateInternalStaff(index, 'utilization', parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateInternalStaff(index, 'utilization', parseFloat(e.target.value) || 0)}
                             className="w-full border-0 rounded-md text-right"
+                            step="0.01"
+                            title="날짜와 제외일 입력 시 자동 계산되지만 수정 가능합니다"
                           />
                         </td>
                         <td className="p-1">
@@ -653,7 +809,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
         </div>
         <footer className="p-4 bg-slate-50 flex justify-end space-x-2">
           <button 
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
           >
             취소

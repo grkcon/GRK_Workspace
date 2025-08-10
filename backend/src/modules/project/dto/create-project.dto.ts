@@ -1,4 +1,12 @@
-import { IsString, IsDateString, IsNumber, IsEnum, IsOptional, ValidateNested, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsDateString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  ValidateNested,
+  IsArray,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProjectStatus } from '../../../entities';
 

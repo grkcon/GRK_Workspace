@@ -1,4 +1,12 @@
-import { IsNumber, IsOptional, IsString, IsDateString, IsPositive, Min, Max } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsPositive,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateEmployeeHRCostDto {

@@ -21,6 +21,7 @@ export interface Employee {
   experience?: Experience[];
   leaveBalance?: LeaveBalance[];
   hrUnitCost?: HRUnitCost;
+  hrCosts?: EmployeeHRCost[];
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
@@ -64,6 +65,37 @@ export interface HRUnitCost {
   yearMonth: string;
   unitCost: number;
   overtimeRate: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EmployeeHRCost {
+  id: number;
+  year: number;
+  annualSalary: number;
+  bonusBaseDate: Date;
+  performanceBaseDate: Date;
+  insuranceRetirement: number;
+  companyBurden: number;
+  monthlyBurden: number;
+  bonusBaseDays: number;
+  bonusRate: number;
+  performanceBaseDays: number;
+  performanceRate: number;
+  bonusAmount: number;
+  welfareCost: number;
+  fixedLaborCost: number;
+  monthlyLaborCost: number;
+  opexAllocation: number;
+  eps: number;
+  monthlyEps: number;
+  ecm: number;
+  finalLaborCost: number;
+  roleMultiplier: number;
+  adjustedMonthlyLaborCost: number;
+  adjustedFinalLaborCost: number;
+  memo?: string;
+  calculationDate: Date;
   createdAt: Date;
   updatedAt: Date;
 }

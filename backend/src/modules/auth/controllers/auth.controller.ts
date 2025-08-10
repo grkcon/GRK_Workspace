@@ -1,5 +1,10 @@
 import { Controller, Post, Body, UseGuards, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { GoogleAuthDto, AuthResponseDto } from '../dto';
 import { JwtAuthGuard } from '../guards';
@@ -14,7 +19,9 @@ export class AuthController {
   @Post('google')
   @ApiOperation({ summary: 'Login with Google OAuth' })
   @ApiResponse({ status: 200, description: 'Google login successful' })
-  async googleAuth(@Body() googleAuthDto: GoogleAuthDto): Promise<AuthResponseDto> {
+  async googleAuth(
+    @Body() googleAuthDto: GoogleAuthDto,
+  ): Promise<AuthResponseDto> {
     return this.authService.googleAuth(googleAuthDto);
   }
 

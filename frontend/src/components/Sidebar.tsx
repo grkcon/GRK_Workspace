@@ -4,71 +4,153 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, userRole, hasPageAccess } = useAuth();
 
-  const menuItems = [
-    {
-      path: '/employees',
-      title: '인사 관리',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-          <circle cx="9" cy="7" r="4"></circle>
-          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-        </svg>
-      )
-    },
-    {
-      path: '/schedule',
-      title: '일정 관리',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-          <line x1="16" y1="2" x2="16" y2="6"></line>
-          <line x1="8" y1="2" x2="8" y2="6"></line>
-          <line x1="3" y1="10" x2="21" y2="10"></line>
-        </svg>
-      )
-    },
-    {
-      path: '/opex',
-      title: 'OPEX 관리',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="12" y1="1" x2="12" y2="23"></line>
-          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-        </svg>
-      )
-    },
-    {
-      path: '/attendance',
-      title: '출퇴근 관리',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12,6 12,12 16,14"></polyline>
-        </svg>
-      )
-    },
-    {
-      path: '/ppe',
-      title: 'PPE 분석',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect width="18" height="18" x="3" y="4" rx="2" ry="2"></rect>
-          <line x1="16" x2="16" y1="2" y2="6"></line>
-          <line x1="8" x2="8" y1="2" y2="6"></line>
-          <line x1="3" x2="21" y1="10" y2="10"></line>
-        </svg>
-      )
-    }
-  ];
+  // 권한별 메뉴 정의
+  const getMenuItems = () => {
+    const allMenuItems = [
+      // 개발자/관리자용 메뉴
+      {
+        path: '/employees',
+        title: '인사 관리',
+        roles: ['DEVELOPER', 'ADMIN', 'MANAGER'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <line x1="23" y1="21" x2="23" y2="15"></line>
+            <line x1="20" y1="18" x2="26" y2="18"></line>
+          </svg>
+        )
+      },
+      // 일정 관리 - 권한별 구분
+      {
+        path: '/schedule-admin',
+        title: '일정 관리 (Admin)',
+        roles: ['DEVELOPER', 'ADMIN', 'MANAGER'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+            <path d="M9 16l2 2 4-4"></path>
+          </svg>
+        )
+      },
+      {
+        path: '/schedule',
+        title: '내 일정',
+        roles: ['EMPLOYEE'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+            <circle cx="12" cy="16" r="1"></circle>
+          </svg>
+        )
+      },
+      {
+        path: '/opex',
+        title: 'OPEX 관리',
+        roles: ['DEVELOPER', 'ADMIN', 'MANAGER'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"></line>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+        )
+      },
+      // 근태 관리 - 권한별 구분
+      {
+        path: '/attendance-admin',
+        title: '근태 관리 (Admin)',
+        roles: ['DEVELOPER', 'ADMIN'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+          </svg>
+        )
+      },
+      {
+        path: '/attendance',
+        title: '근태 관리',
+        roles: ['EMPLOYEE'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12,6 12,12 16,14"></polyline>
+          </svg>
+        )
+      },
+      {
+        path: '/ppe',
+        title: 'PPE 분석',
+        roles: ['DEVELOPER', 'ADMIN', 'MANAGER'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+        )
+      },
+      // 평가 관리 - 권한별 구분
+      {
+        path: '/evaluation',
+        title: '평가 관리 (Admin)',
+        roles: ['DEVELOPER', 'ADMIN', 'MANAGER'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        )
+      },
+      {
+        path: '/evaluation-personal',
+        title: '내 평가',
+        roles: ['EMPLOYEE'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        )
+      },
+      {
+        path: '/cr',
+        title: 'CR 관리',
+        roles: ['DEVELOPER', 'ADMIN', 'MANAGER'],
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        )
+      }
+    ];
+
+    // 사용자 권한에 따라 메뉴 필터링
+    if (!userRole) return [];
+    
+    return allMenuItems.filter(item => {
+      // 개발자는 모든 메뉴 접근
+      if (userRole === 'DEVELOPER') return true;
+      // 다른 권한은 roles 배열에 포함된 경우만 접근
+      return item.roles.includes(userRole);
+    });
+  };
+
+  const menuItems = getMenuItems();
 
   return (
-    <aside className="w-20 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col items-center py-4 space-y-4">
-      <Link to="/" className="h-10 w-10 flex items-center justify-center bg-slate-800 text-white font-bold rounded-lg text-lg">
-        G
+    <aside className="w-20 flex-shrink-0 bg-transparent border-r border-slate-200 flex flex-col items-center py-4 space-y-4">
+      <Link to="/" className="h-12 w-12 flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+        <div className="text-center">
+          <div className="text-xs font-bold leading-none">GRK</div>
+        </div>
       </Link>
       <nav className="flex flex-col items-center space-y-2">
         {menuItems.map((item) => (

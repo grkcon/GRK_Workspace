@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { LeaveRequest, Employee, LeaveBalance, RequestStatus } from '../../../entities';
+import {
+  LeaveRequest,
+  Employee,
+  LeaveBalance,
+  RequestStatus,
+} from '../../../entities';
 import { CreateLeaveRequestDto, UpdateLeaveRequestDto } from '../dto';
 
 @Injectable()
@@ -15,19 +20,25 @@ export class AttendanceService {
     private leaveBalanceRepository: Repository<LeaveBalance>,
   ) {}
 
-  async create(createLeaveRequestDto: CreateLeaveRequestDto): Promise<LeaveRequest> {
+  async create(
+    createLeaveRequestDto: CreateLeaveRequestDto,
+  ): Promise<LeaveRequest> {
     const employee = await this.employeeRepository.findOne({
       where: { id: createLeaveRequestDto.employeeId },
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${createLeaveRequestDto.employeeId} not found`);
+      throw new NotFoundException(
+        `Employee with ID ${createLeaveRequestDto.employeeId} not found`,
+      );
     }
 
     const leaveRequest = this.leaveRequestRepository.create({
       ...createLeaveRequestDto,
       employee,
-      requestDate: createLeaveRequestDto.requestDate ? new Date(createLeaveRequestDto.requestDate) : new Date(),
+      requestDate: createLeaveRequestDto.requestDate
+        ? new Date(createLeaveRequestDto.requestDate)
+        : new Date(),
       startDate: new Date(createLeaveRequestDto.startDate),
       endDate: new Date(createLeaveRequestDto.endDate),
     });
@@ -71,7 +82,10 @@ export class AttendanceService {
     return leaveRequest;
   }
 
-  async update(id: number, updateLeaveRequestDto: UpdateLeaveRequestDto): Promise<LeaveRequest> {
+  async update(
+    id: number,
+    updateLeaveRequestDto: UpdateLeaveRequestDto,
+  ): Promise<LeaveRequest> {
     const leaveRequest = await this.findOne(id);
 
     // Update dates if provided
@@ -94,7 +108,7 @@ export class AttendanceService {
 
   async approveRequest(id: number, approver: string): Promise<LeaveRequest> {
     const leaveRequest = await this.findOne(id);
-    
+
     leaveRequest.status = RequestStatus.APPROVED;
     leaveRequest.approver = approver;
 
@@ -106,7 +120,7 @@ export class AttendanceService {
 
   async rejectRequest(id: number, rejectReason: string): Promise<LeaveRequest> {
     const leaveRequest = await this.findOne(id);
-    
+
     leaveRequest.status = RequestStatus.REJECTED;
     leaveRequest.rejectReason = rejectReason;
 
@@ -142,11 +156,16 @@ export class AttendanceService {
     return leaveBalance;
   }
 
-  private async updateLeaveBalance(employeeId: number, days: number): Promise<void> {
+  private async updateLeaveBalance(
+    employeeId: number,
+    days: number,
+  ): Promise<void> {
     const leaveBalance = await this.getLeaveBalance(employeeId);
-    
+
     leaveBalance.used = parseFloat(leaveBalance.used.toString()) + days;
-    leaveBalance.remaining = parseFloat(leaveBalance.total.toString()) - parseFloat(leaveBalance.used.toString());
+    leaveBalance.remaining =
+      parseFloat(leaveBalance.total.toString()) -
+      parseFloat(leaveBalance.used.toString());
 
     await this.leaveBalanceRepository.save(leaveBalance);
   }

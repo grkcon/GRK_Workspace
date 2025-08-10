@@ -38,32 +38,32 @@ export class ProjectService {
     // 프로젝트 클라이언트 정보
     if (createProjectDto.projectClient) {
       project.projectClient = this.projectClientRepository.create(
-        createProjectDto.projectClient
+        createProjectDto.projectClient,
       );
     }
 
     // 프로젝트 결제 정보
     if (createProjectDto.projectPayment) {
       project.projectPayment = this.projectPaymentRepository.create(
-        createProjectDto.projectPayment
+        createProjectDto.projectPayment,
       );
     }
 
     // 내부 인력
     if (createProjectDto.internalStaff) {
-      project.internalStaff = createProjectDto.internalStaff.map(staff =>
+      project.internalStaff = createProjectDto.internalStaff.map((staff) =>
         this.internalStaffRepository.create({
           ...staff,
           startDate: new Date(staff.startDate),
           endDate: new Date(staff.endDate),
-        })
+        }),
       );
     }
 
     // 외부 인력
     if (createProjectDto.externalStaff) {
-      project.externalStaff = createProjectDto.externalStaff.map(staff =>
-        this.externalStaffRepository.create(staff)
+      project.externalStaff = createProjectDto.externalStaff.map((staff) =>
+        this.externalStaffRepository.create(staff),
       );
     }
 
@@ -108,13 +108,20 @@ export class ProjectService {
     return project;
   }
 
-  async update(id: number, updateProjectDto: UpdateProjectDto): Promise<Project> {
+  async update(
+    id: number,
+    updateProjectDto: UpdateProjectDto,
+  ): Promise<Project> {
     const project = await this.findOne(id);
 
     Object.assign(project, {
       ...updateProjectDto,
-      startDate: updateProjectDto.startDate ? new Date(updateProjectDto.startDate) : project.startDate,
-      endDate: updateProjectDto.endDate ? new Date(updateProjectDto.endDate) : project.endDate,
+      startDate: updateProjectDto.startDate
+        ? new Date(updateProjectDto.startDate)
+        : project.startDate,
+      endDate: updateProjectDto.endDate
+        ? new Date(updateProjectDto.endDate)
+        : project.endDate,
     });
 
     // 클라이언트 정보 업데이트
@@ -123,7 +130,7 @@ export class ProjectService {
         Object.assign(project.projectClient, updateProjectDto.projectClient);
       } else {
         project.projectClient = this.projectClientRepository.create(
-          updateProjectDto.projectClient
+          updateProjectDto.projectClient,
         );
       }
     }
@@ -134,7 +141,7 @@ export class ProjectService {
         Object.assign(project.projectPayment, updateProjectDto.projectPayment);
       } else {
         project.projectPayment = this.projectPaymentRepository.create(
-          updateProjectDto.projectPayment
+          updateProjectDto.projectPayment,
         );
       }
     }

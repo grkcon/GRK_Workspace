@@ -82,8 +82,17 @@ const LoginWithCustomButton: React.FC<LoginWithCustomButtonProps> = ({ clientId 
       <div className="flex items-center justify-center min-h-screen bg-slate-100 px-4">
         <div className="w-full max-w-md mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-800">GRK Workspace</h1>
-            <p className="text-slate-600 mt-2">관리 시스템</p>
+            <div className="flex justify-center mb-4">
+              <div className="text-center">
+                <div className="text-5xl font-bold tracking-wider mb-2">
+                  <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">GRK</span>
+                </div>
+                <div className="text-lg font-light tracking-[0.3em] text-slate-600 uppercase">
+                  WORKSPACE
+                </div>
+              </div>
+            </div>
+            <p className="text-slate-600 mt-4">관리 시스템</p>
           </div>
 
           {/* 로그인 카드 */}

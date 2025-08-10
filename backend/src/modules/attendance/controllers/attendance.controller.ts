@@ -9,7 +9,13 @@ import {
   Query,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AttendanceService } from '../services/attendance.service';
 import { CreateLeaveRequestDto, UpdateLeaveRequestDto } from '../dto';
 import { RequestStatus } from '../../../entities';
@@ -21,7 +27,10 @@ export class AttendanceController {
 
   @Post('leave-requests')
   @ApiOperation({ summary: 'Create a new leave request' })
-  @ApiResponse({ status: 201, description: 'Leave request created successfully.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Leave request created successfully.',
+  })
   @ApiResponse({ status: 400, description: 'Bad request.' })
   create(@Body() createLeaveRequestDto: CreateLeaveRequestDto) {
     return this.attendanceService.create(createLeaveRequestDto);
@@ -29,8 +38,16 @@ export class AttendanceController {
 
   @Get('leave-requests')
   @ApiOperation({ summary: 'Get all leave requests' })
-  @ApiQuery({ name: 'employeeId', required: false, description: 'Filter by employee ID' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
+  @ApiQuery({
+    name: 'employeeId',
+    required: false,
+    description: 'Filter by employee ID',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by status',
+  })
   @ApiResponse({ status: 200, description: 'Return all leave requests.' })
   findAllLeaveRequests(
     @Query('employeeId') employeeId?: string,
@@ -57,7 +74,10 @@ export class AttendanceController {
   @Patch('leave-requests/:id')
   @ApiOperation({ summary: 'Update leave request' })
   @ApiParam({ name: 'id', description: 'Leave request ID' })
-  @ApiResponse({ status: 200, description: 'Leave request updated successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Leave request updated successfully.',
+  })
   @ApiResponse({ status: 404, description: 'Leave request not found.' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -69,7 +89,10 @@ export class AttendanceController {
   @Delete('leave-requests/:id')
   @ApiOperation({ summary: 'Delete leave request' })
   @ApiParam({ name: 'id', description: 'Leave request ID' })
-  @ApiResponse({ status: 200, description: 'Leave request deleted successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Leave request deleted successfully.',
+  })
   @ApiResponse({ status: 404, description: 'Leave request not found.' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.attendanceService.remove(id);
@@ -78,7 +101,10 @@ export class AttendanceController {
   @Patch('leave-requests/:id/approve')
   @ApiOperation({ summary: 'Approve leave request' })
   @ApiParam({ name: 'id', description: 'Leave request ID' })
-  @ApiResponse({ status: 200, description: 'Leave request approved successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Leave request approved successfully.',
+  })
   @ApiResponse({ status: 404, description: 'Leave request not found.' })
   approve(
     @Param('id', ParseIntPipe) id: number,
@@ -90,7 +116,10 @@ export class AttendanceController {
   @Patch('leave-requests/:id/reject')
   @ApiOperation({ summary: 'Reject leave request' })
   @ApiParam({ name: 'id', description: 'Leave request ID' })
-  @ApiResponse({ status: 200, description: 'Leave request rejected successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Leave request rejected successfully.',
+  })
   @ApiResponse({ status: 404, description: 'Leave request not found.' })
   reject(
     @Param('id', ParseIntPipe) id: number,

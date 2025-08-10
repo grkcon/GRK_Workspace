@@ -10,7 +10,7 @@ import { EmployeeModule } from '../employee/employee.module';
 export class OpexModule {
   static forRoot(): DynamicModule {
     const controllers: any[] = [OpexController];
-    
+
     // 개발 환경에서만 디버그 컨트롤러 추가
     if (process.env.NODE_ENV !== 'production') {
       controllers.push(OpexDebugController);
@@ -20,7 +20,7 @@ export class OpexModule {
       module: OpexModule,
       imports: [
         TypeOrmModule.forFeature([YearlyOpex, MonthlyOpex, OpexItem]),
-        forwardRef(() => EmployeeModule)
+        forwardRef(() => EmployeeModule),
       ],
       controllers,
       providers: [OpexService],

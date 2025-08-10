@@ -1,7 +1,23 @@
-import { IsString, IsNumber, IsInt, IsBoolean, IsOptional, IsArray, ValidateNested, IsEnum, MinLength, MaxLength, Min } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsInt,
+  IsBoolean,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsEnum,
+  MinLength,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { OpexType } from '../../../entities';
-import { IsPositiveAmount, IsValidMonth, IsValidYear } from '../../../common/validators/opex.validators';
+import {
+  IsPositiveAmount,
+  IsValidMonth,
+  IsValidYear,
+} from '../../../common/validators/opex.validators';
 
 export class CreateOpexItemDto {
   @IsInt()
@@ -23,7 +39,6 @@ export class CreateOpexItemDto {
 
   @IsEnum(OpexType)
   type: OpexType;
-
 }
 
 export class CreateMonthlyOpexDto {

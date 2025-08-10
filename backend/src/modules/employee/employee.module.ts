@@ -1,6 +1,14 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Employee, Education, Experience, LeaveBalance, LeaveRequest, Document, EmployeeHRCost } from '../../entities';
+import {
+  Employee,
+  Education,
+  Experience,
+  LeaveBalance,
+  LeaveRequest,
+  Document,
+  EmployeeHRCost,
+} from '../../entities';
 import { EmployeeService } from './services/employee.service';
 import { DocumentService } from './services/document.service';
 import { EmployeeHRCostService } from './services/hr-cost.service';

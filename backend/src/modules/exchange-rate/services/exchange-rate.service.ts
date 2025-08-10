@@ -16,7 +16,7 @@ export class ExchangeRateService {
   // 현재 USD/KRW 환율 조회
   async getCurrentUSDToKRW() {
     const today = new Date().toISOString().split('T')[0];
-    
+
     let todayRate = await this.exchangeRateRepository.findOne({
       where: { currency: 'USD', date: today },
     });
@@ -31,13 +31,16 @@ export class ExchangeRateService {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayDate = yesterday.toISOString().split('T')[0];
-      
+
       const yesterdayRate = await this.exchangeRateRepository.findOne({
         where: { currency: 'USD', date: yesterdayDate },
       });
 
       if (yesterdayRate) {
-        const changePercent = ((Number(todayRate.rate) - Number(yesterdayRate.rate)) / Number(yesterdayRate.rate)) * 100;
+        const changePercent =
+          ((Number(todayRate.rate) - Number(yesterdayRate.rate)) /
+            Number(yesterdayRate.rate)) *
+          100;
         todayRate.change = Number(changePercent.toFixed(2));
       }
     }
@@ -54,15 +57,19 @@ export class ExchangeRateService {
   }
 
   // 외부 API에서 환율 정보 가져오기
-  private async fetchAndSaveExchangeRate(currency: string): Promise<ExchangeRate | null> {
+  private async fetchAndSaveExchangeRate(
+    currency: string,
+  ): Promise<ExchangeRate | null> {
     try {
       // exchangerate-api.com 사용 (무료)
-      const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${currency}`);
+      const response = await fetch(
+        `https://api.exchangerate-api.com/v4/latest/${currency}`,
+      );
       const data = await response.json();
-      
+
       if (data.rates && data.rates.KRW) {
         const today = new Date().toISOString().split('T')[0];
-        
+
         const exchangeRate = this.exchangeRateRepository.create({
           currency,
           rate: data.rates.KRW,
@@ -75,7 +82,7 @@ export class ExchangeRateService {
     } catch (error) {
       this.logger.error(`환율 정보 가져오기 실패: ${error.message}`);
     }
-    
+
     return null;
   }
 
@@ -85,7 +92,7 @@ export class ExchangeRateService {
   })
   async updateDailyExchangeRates() {
     this.logger.log('일일 환율 업데이트 시작');
-    
+
     try {
       await this.fetchAndSaveExchangeRate('USD');
       this.logger.log('USD/KRW 환율 업데이트 완료');

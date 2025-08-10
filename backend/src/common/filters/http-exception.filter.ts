@@ -25,7 +25,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'object') {
         message = (exceptionResponse as any).message || exception.message;
         error = (exceptionResponse as any).error || 'ERROR';
@@ -35,12 +35,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       message = exception.message;
-      
+
       // TypeORM 관련 에러 처리
       if (exception.name === 'QueryFailedError') {
         status = HttpStatus.BAD_REQUEST;
         error = 'DATABASE_ERROR';
-        
+
         // PostgreSQL 에러 코드 처리
         const pgError = exception as any;
         if (pgError.code === '23505') {
@@ -70,9 +70,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error,
       message,
       ...(details && { details }),
-      ...(isDevelopment && exception instanceof Error && {
-        stack: exception.stack,
-      }),
+      ...(isDevelopment &&
+        exception instanceof Error && {
+          stack: exception.stack,
+        }),
     });
   }
 }

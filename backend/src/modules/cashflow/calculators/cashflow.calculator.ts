@@ -5,7 +5,11 @@ export class CashFlowCalculator {
   /**
    * 엑셀 공식: =G7+G35-G8 (기말현금 = 기초현금 + 수입 - 지출)
    */
-  calculateEndingCash(beginningCash: number, revenue: number, expense: number): number {
+  calculateEndingCash(
+    beginningCash: number,
+    revenue: number,
+    expense: number,
+  ): number {
     return beginningCash + revenue - expense;
   }
 
@@ -16,7 +20,7 @@ export class CashFlowCalculator {
     laborCost: number,
     indirectOpex: number,
     directOpex: number,
-    bonus: number = 0
+    bonus: number = 0,
   ): number {
     return laborCost + indirectOpex + directOpex + bonus;
   }
@@ -25,10 +29,15 @@ export class CashFlowCalculator {
    * 프로젝트 손익 계산
    * 엑셀 공식: 매출 - 원가 - 운영비 = 순이익
    */
-  calculateProjectProfit(revenue: number, laborCost: number, outsourcingCost: number, opexCost: number) {
+  calculateProjectProfit(
+    revenue: number,
+    laborCost: number,
+    outsourcingCost: number,
+    opexCost: number,
+  ) {
     const grossIncome = revenue - laborCost - outsourcingCost;
     const operationIncome = grossIncome - opexCost;
-    
+
     return {
       grossIncome,
       grossIncomeRate: revenue > 0 ? (grossIncome / revenue) * 100 : 0,

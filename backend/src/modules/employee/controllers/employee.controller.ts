@@ -15,14 +15,27 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiConsumes,
+} from '@nestjs/swagger';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { EmployeeService } from '../services/employee.service';
 import { DocumentService } from '../services/document.service';
 import { EmployeeHRCostService } from '../services/hr-cost.service';
-import { CreateEmployeeDto, UpdateEmployeeDto, UpdateDocumentDto, CreateEmployeeHRCostDto, UpdateEmployeeHRCostDto } from '../dto';
+import {
+  CreateEmployeeDto,
+  UpdateEmployeeDto,
+  UpdateDocumentDto,
+  CreateEmployeeHRCostDto,
+  UpdateEmployeeHRCostDto,
+} from '../dto';
 import { Response } from 'express';
 
 @ApiTags('employees')
@@ -43,14 +56,34 @@ export class EmployeeController {
     console.log('Request Body:', JSON.stringify(createEmployeeDto, null, 2));
     console.log('Request Body Type:', typeof createEmployeeDto);
     console.log('Data types:');
-    console.log('- name:', typeof createEmployeeDto.name, createEmployeeDto.name);
+    console.log(
+      '- name:',
+      typeof createEmployeeDto.name,
+      createEmployeeDto.name,
+    );
     console.log('- age:', typeof createEmployeeDto.age, createEmployeeDto.age);
-    console.log('- monthlySalary:', typeof createEmployeeDto.monthlySalary, createEmployeeDto.monthlySalary);
-    console.log('- joinDate:', typeof createEmployeeDto.joinDate, createEmployeeDto.joinDate);
-    console.log('- education:', typeof createEmployeeDto.education, createEmployeeDto.education);
-    console.log('- experience:', typeof createEmployeeDto.experience, createEmployeeDto.experience);
+    console.log(
+      '- monthlySalary:',
+      typeof createEmployeeDto.monthlySalary,
+      createEmployeeDto.monthlySalary,
+    );
+    console.log(
+      '- joinDate:',
+      typeof createEmployeeDto.joinDate,
+      createEmployeeDto.joinDate,
+    );
+    console.log(
+      '- education:',
+      typeof createEmployeeDto.education,
+      createEmployeeDto.education,
+    );
+    console.log(
+      '- experience:',
+      typeof createEmployeeDto.experience,
+      createEmployeeDto.experience,
+    );
     console.log('=====================================');
-    
+
     try {
       const result = await this.employeeService.create(createEmployeeDto);
       console.log('Employee created successfully:', result.id);
@@ -65,7 +98,11 @@ export class EmployeeController {
 
   @Get()
   @ApiOperation({ summary: 'Get all employees' })
-  @ApiQuery({ name: 'department', required: false, description: 'Filter by department' })
+  @ApiQuery({
+    name: 'department',
+    required: false,
+    description: 'Filter by department',
+  })
   @ApiResponse({ status: 200, description: 'Return all employees.' })
   findAll(@Query('department') department?: string) {
     if (department) {
@@ -113,14 +150,34 @@ export class EmployeeController {
     console.log('Request Body:', JSON.stringify(updateEmployeeDto, null, 2));
     console.log('Request Body Type:', typeof updateEmployeeDto);
     console.log('Data types:');
-    console.log('- name:', typeof updateEmployeeDto.name, updateEmployeeDto.name);
+    console.log(
+      '- name:',
+      typeof updateEmployeeDto.name,
+      updateEmployeeDto.name,
+    );
     console.log('- age:', typeof updateEmployeeDto.age, updateEmployeeDto.age);
-    console.log('- monthlySalary:', typeof updateEmployeeDto.monthlySalary, updateEmployeeDto.monthlySalary);
-    console.log('- joinDate:', typeof updateEmployeeDto.joinDate, updateEmployeeDto.joinDate);
-    console.log('- education:', typeof updateEmployeeDto.education, updateEmployeeDto.education);
-    console.log('- experience:', typeof updateEmployeeDto.experience, updateEmployeeDto.experience);
+    console.log(
+      '- monthlySalary:',
+      typeof updateEmployeeDto.monthlySalary,
+      updateEmployeeDto.monthlySalary,
+    );
+    console.log(
+      '- joinDate:',
+      typeof updateEmployeeDto.joinDate,
+      updateEmployeeDto.joinDate,
+    );
+    console.log(
+      '- education:',
+      typeof updateEmployeeDto.education,
+      updateEmployeeDto.education,
+    );
+    console.log(
+      '- experience:',
+      typeof updateEmployeeDto.experience,
+      updateEmployeeDto.experience,
+    );
     console.log('=====================================');
-    
+
     try {
       const result = await this.employeeService.update(id, updateEmployeeDto);
       console.log('Employee updated successfully:', result.id);
@@ -163,34 +220,45 @@ export class EmployeeController {
   @ApiOperation({ summary: 'Upload employee profile image' })
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', description: 'Employee ID' })
-  @ApiResponse({ status: 200, description: 'Profile image uploaded successfully.' })
-  @ApiResponse({ status: 400, description: 'Invalid file or employee not found.' })
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: (req, file, cb) => {
-        const uploadPath = join(process.cwd(), 'uploads', 'profile-images');
-        if (!existsSync(uploadPath)) {
-          mkdirSync(uploadPath, { recursive: true });
+  @ApiResponse({
+    status: 200,
+    description: 'Profile image uploaded successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file or employee not found.',
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = join(process.cwd(), 'uploads', 'profile-images');
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const id = req.params.id;
+          const fileExtName = extname(file.originalname);
+          const fileName = `employee-${id}-${Date.now()}${fileExtName}`;
+          cb(null, fileName);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
+          return cb(
+            new BadRequestException('Only image files are allowed!'),
+            false,
+          );
         }
-        cb(null, uploadPath);
+        cb(null, true);
       },
-      filename: (req, file, cb) => {
-        const id = req.params.id;
-        const fileExtName = extname(file.originalname);
-        const fileName = `employee-${id}-${Date.now()}${fileExtName}`;
-        cb(null, fileName);
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
       },
     }),
-    fileFilter: (req, file, cb) => {
-      if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-        return cb(new BadRequestException('Only image files are allowed!'), false);
-      }
-      cb(null, true);
-    },
-    limits: {
-      fileSize: 5 * 1024 * 1024, // 5MB
-    },
-  }))
+  )
   async uploadProfileImage(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
@@ -209,35 +277,45 @@ export class EmployeeController {
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', description: 'Employee ID' })
   @ApiResponse({ status: 201, description: 'Document uploaded successfully.' })
-  @ApiResponse({ status: 400, description: 'Invalid file or employee not found.' })
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: (req, file, cb) => {
-        const uploadPath = join(process.cwd(), 'uploads', 'documents');
-        if (!existsSync(uploadPath)) {
-          mkdirSync(uploadPath, { recursive: true });
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file or employee not found.',
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = join(process.cwd(), 'uploads', 'documents');
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const employeeId = req.params.id;
+          const timestamp = Date.now();
+          const randomString = Math.random().toString(36).substring(7);
+          const fileExtName = extname(file.originalname);
+          const fileName = `emp-${employeeId}-${timestamp}-${randomString}${fileExtName}`;
+          cb(null, fileName);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!DocumentService.isAllowedFileType(file.mimetype)) {
+          return cb(
+            new BadRequestException(
+              'File type not allowed. Only PDF, DOC, DOCX, JPG, PNG are allowed.',
+            ),
+            false,
+          );
         }
-        cb(null, uploadPath);
+        cb(null, true);
       },
-      filename: (req, file, cb) => {
-        const employeeId = req.params.id;
-        const timestamp = Date.now();
-        const randomString = Math.random().toString(36).substring(7);
-        const fileExtName = extname(file.originalname);
-        const fileName = `emp-${employeeId}-${timestamp}-${randomString}${fileExtName}`;
-        cb(null, fileName);
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB
       },
     }),
-    fileFilter: (req, file, cb) => {
-      if (!DocumentService.isAllowedFileType(file.mimetype)) {
-        return cb(new BadRequestException('File type not allowed. Only PDF, DOC, DOCX, JPG, PNG are allowed.'), false);
-      }
-      cb(null, true);
-    },
-    limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB
-    },
-  }))
+  )
   async uploadDocument(
     @Param('id', ParseIntPipe) employeeId: number,
     @UploadedFile() file: Express.Multer.File,
@@ -249,12 +327,14 @@ export class EmployeeController {
     }
 
     if (!DocumentService.isAllowedFileSize(file.size)) {
-      throw new BadRequestException('File size too large. Maximum size is 10MB.');
+      throw new BadRequestException(
+        'File size too large. Maximum size is 10MB.',
+      );
     }
 
     return this.documentService.uploadDocument(employeeId, file, {
       documentType: documentType as any,
-      description
+      description,
     });
   }
 
@@ -272,14 +352,18 @@ export class EmployeeController {
   @Get('documents/:documentId/download')
   @ApiOperation({ summary: 'Download document' })
   @ApiParam({ name: 'documentId', description: 'Document ID' })
-  @ApiResponse({ status: 200, description: 'Document downloaded successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Document downloaded successfully.',
+  })
   @ApiResponse({ status: 404, description: 'Document not found.' })
   async downloadDocument(
     @Param('documentId', ParseIntPipe) documentId: number,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { stream, document } = await this.documentService.getFileStream(documentId);
-    
+    const { stream, document } =
+      await this.documentService.getFileStream(documentId);
+
     res.set({
       'Content-Type': document.mimeType,
       'Content-Disposition': `attachment; filename="${encodeURIComponent(document.originalName)}"`,
@@ -314,14 +398,15 @@ export class EmployeeController {
 
   // 해당 월 기준 재직 직원수 조회
   @Get('active-count/:year/:month')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get active employee count for specific month',
-    description: '특정 연도/월 기준으로 실제 재직 중인 직원수를 반환합니다. 퇴사일, 휴직 기간을 고려하여 계산됩니다.'
+    description:
+      '특정 연도/월 기준으로 실제 재직 중인 직원수를 반환합니다. 퇴사일, 휴직 기간을 고려하여 계산됩니다.',
   })
   @ApiParam({ name: 'year', description: '연도 (예: 2025)' })
   @ApiParam({ name: 'month', description: '월 (1-12)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: '해당 월 재직 직원수',
     schema: {
       type: 'object',
@@ -329,8 +414,8 @@ export class EmployeeController {
         year: { type: 'number', example: 2025 },
         month: { type: 'number', example: 3 },
         activeEmployeeCount: { type: 'number', example: 15 },
-      }
-    }
+      },
+    },
   })
   async getActiveEmployeeCountByMonth(
     @Param('year', ParseIntPipe) year: number,
@@ -341,8 +426,9 @@ export class EmployeeController {
       throw new BadRequestException('Month must be between 1 and 12');
     }
 
-    const activeEmployeeCount = await this.employeeService.getActiveEmployeeCountByMonth(year, month);
-    
+    const activeEmployeeCount =
+      await this.employeeService.getActiveEmployeeCountByMonth(year, month);
+
     return {
       year,
       month,
@@ -370,20 +456,30 @@ export class EmployeeController {
   @ApiParam({ name: 'id', description: 'Employee ID' })
   @ApiParam({ name: 'year', description: '연도 (예: 2025)' })
   @ApiParam({ name: 'month', description: '월 (1-12)' })
-  @ApiResponse({ status: 200, description: 'Employee HR cost data for the month' })
+  @ApiResponse({
+    status: 200,
+    description: 'Employee HR cost data for the month',
+  })
   @ApiResponse({ status: 404, description: 'Employee not found' })
   async getEmployeeHRCostByMonth(
     @Param('id', ParseIntPipe) employeeId: number,
     @Param('year', ParseIntPipe) year: number,
     @Param('month', ParseIntPipe) month: number,
   ) {
-    return await this.hrCostService.findByEmployeeYearMonth(employeeId, year, month);
+    return await this.hrCostService.findByEmployeeYearMonth(
+      employeeId,
+      year,
+      month,
+    );
   }
 
   @Post(':id/hr-cost')
   @ApiOperation({ summary: 'Create employee HR cost data' })
   @ApiParam({ name: 'id', description: 'Employee ID' })
-  @ApiResponse({ status: 201, description: 'HR cost data created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'HR cost data created successfully',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 409, description: 'HR cost data already exists' })
   async createEmployeeHRCost(
@@ -399,7 +495,10 @@ export class EmployeeController {
   @ApiOperation({ summary: 'Update employee HR cost data' })
   @ApiParam({ name: 'id', description: 'Employee ID' })
   @ApiParam({ name: 'year', description: '연도 (예: 2025)' })
-  @ApiResponse({ status: 200, description: 'HR cost data updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'HR cost data updated successfully',
+  })
   @ApiResponse({ status: 404, description: 'HR cost data not found' })
   async updateEmployeeHRCost(
     @Param('id', ParseIntPipe) employeeId: number,
@@ -410,14 +509,14 @@ export class EmployeeController {
   }
 
   @Get('hr-cost-all/:year/:month')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get HR cost for all employees for specific year and month',
-    description: '모든 직원의 특정 연도/월 HR Cost를 조회합니다.'
+    description: '모든 직원의 특정 연도/월 HR Cost를 조회합니다.',
   })
   @ApiParam({ name: 'year', description: '연도 (예: 2025)' })
   @ApiParam({ name: 'month', description: '월 (1-12)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: '모든 직원의 HR Cost 데이터',
     schema: {
       type: 'array',
@@ -432,12 +531,12 @@ export class EmployeeController {
               position: { type: 'string' },
               department: { type: 'string' },
               monthlySalary: { type: 'string' },
-            }
+            },
           },
-          hrCost: { type: 'object' }
-        }
-      }
-    }
+          hrCost: { type: 'object' },
+        },
+      },
+    },
   })
   async getAllEmployeesHRCost(
     @Param('year', ParseIntPipe) year: number,

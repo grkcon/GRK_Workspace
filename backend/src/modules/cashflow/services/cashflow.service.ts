@@ -33,7 +33,8 @@ export class CashFlowService {
       const monthlyFlow = this.monthlyFlowRepository.create({
         ...flowDto,
         cashFlow: savedCashFlow,
-        beginningCash: flowDto.month === 1 ? flowDto.beginningCash || 0 : previousEndingCash,
+        beginningCash:
+          flowDto.month === 1 ? flowDto.beginningCash || 0 : previousEndingCash,
       });
 
       // 지출 계산
@@ -41,14 +42,14 @@ export class CashFlowService {
         monthlyFlow.laborCost || 0,
         monthlyFlow.indirectOpex || 0,
         monthlyFlow.directOpex || 0,
-        monthlyFlow.bonus || 0
+        monthlyFlow.bonus || 0,
       );
 
       // 기말현금 계산
       monthlyFlow.endingCash = this.cashFlowCalculator.calculateEndingCash(
         monthlyFlow.beginningCash,
         (monthlyFlow.revenue || 0) + (monthlyFlow.researchRevenue || 0),
-        monthlyFlow.expense
+        monthlyFlow.expense,
       );
 
       previousEndingCash = monthlyFlow.endingCash;
@@ -56,16 +57,20 @@ export class CashFlowService {
     }
 
     // 월별 데이터 저장
-    savedCashFlow.monthlyFlows = await this.monthlyFlowRepository.save(monthlyFlows);
+    savedCashFlow.monthlyFlows =
+      await this.monthlyFlowRepository.save(monthlyFlows);
 
     // 총합 계산
-    savedCashFlow.totalRevenue = monthlyFlows.reduce((sum, flow) => 
-      sum + flow.revenue + flow.researchRevenue, 0
+    savedCashFlow.totalRevenue = monthlyFlows.reduce(
+      (sum, flow) => sum + flow.revenue + flow.researchRevenue,
+      0,
     );
-    savedCashFlow.totalExpense = monthlyFlows.reduce((sum, flow) => 
-      sum + flow.expense, 0
+    savedCashFlow.totalExpense = monthlyFlows.reduce(
+      (sum, flow) => sum + flow.expense,
+      0,
     );
-    savedCashFlow.netCashFlow = savedCashFlow.totalRevenue - savedCashFlow.totalExpense;
+    savedCashFlow.netCashFlow =
+      savedCashFlow.totalRevenue - savedCashFlow.totalExpense;
 
     return this.cashFlowRepository.save(savedCashFlow);
   }
@@ -98,7 +103,10 @@ export class CashFlowService {
     });
   }
 
-  async update(id: number, updateCashFlowDto: UpdateCashFlowDto): Promise<CashFlow> {
+  async update(
+    id: number,
+    updateCashFlowDto: UpdateCashFlowDto,
+  ): Promise<CashFlow> {
     const cashFlow = await this.findOne(id);
 
     Object.assign(cashFlow, {
@@ -116,14 +124,16 @@ export class CashFlowService {
 
   async calculateMonthlyCashFlow(year: number, month: number): Promise<any> {
     const cashFlows = await this.findByYear(year);
-    
+
     let totalBeginningCash = 0;
     let totalRevenue = 0;
     let totalExpense = 0;
     let totalEndingCash = 0;
 
     for (const cashFlow of cashFlows) {
-      const targetFlow = cashFlow.monthlyFlows.find(flow => flow.month === month);
+      const targetFlow = cashFlow.monthlyFlows.find(
+        (flow) => flow.month === month,
+      );
       if (targetFlow) {
         totalBeginningCash += targetFlow.beginningCash;
         totalRevenue += targetFlow.revenue;
@@ -139,9 +149,9 @@ export class CashFlowService {
       totalRevenue,
       totalExpense,
       totalEndingCash,
-      projects: cashFlows.map(cf => ({
+      projects: cashFlows.map((cf) => ({
         projectName: cf.projectName,
-        monthlyFlow: cf.monthlyFlows.find(flow => flow.month === month),
+        monthlyFlow: cf.monthlyFlows.find((flow) => flow.month === month),
       })),
     };
   }

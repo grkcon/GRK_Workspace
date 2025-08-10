@@ -3,11 +3,11 @@ import { BaseEntity } from './base.entity';
 import { Employee } from './employee.entity';
 
 export enum DocumentType {
-  RESUME = 'RESUME',           // 이력서
-  DIPLOMA = 'DIPLOMA',         // 졸업증명서
+  RESUME = 'RESUME', // 이력서
+  DIPLOMA = 'DIPLOMA', // 졸업증명서
   CAREER_CERT = 'CAREER_CERT', // 경력증명서
-  LICENSE = 'LICENSE',         // 자격증
-  OTHER = 'OTHER'              // 기타
+  LICENSE = 'LICENSE', // 자격증
+  OTHER = 'OTHER', // 기타
 }
 
 @Entity('documents')

@@ -3,18 +3,18 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DocumentType } from '../../../entities';
 
 export class CreateDocumentDto {
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Document type',
     enum: DocumentType,
-    example: DocumentType.RESUME 
+    example: DocumentType.RESUME,
   })
   @IsEnum(DocumentType, { message: '올바른 문서 타입이 아닙니다.' })
   documentType: DocumentType;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Document description',
     maxLength: 500,
-    example: '2024년 최신 이력서' 
+    example: '2024년 최신 이력서',
   })
   @IsString({ message: '문서 설명은 문자열이어야 합니다.' })
   @IsOptional()
@@ -23,17 +23,17 @@ export class CreateDocumentDto {
 }
 
 export class UpdateDocumentDto {
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Document type',
-    enum: DocumentType 
+    enum: DocumentType,
   })
   @IsEnum(DocumentType, { message: '올바른 문서 타입이 아닙니다.' })
   @IsOptional()
   documentType?: DocumentType;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Document description',
-    maxLength: 500 
+    maxLength: 500,
   })
   @IsString({ message: '문서 설명은 문자열이어야 합니다.' })
   @IsOptional()

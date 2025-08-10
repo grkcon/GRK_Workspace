@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Document, Employee } from '../../../entities';
@@ -96,7 +100,9 @@ export class DocumentService {
     await this.documentRepository.remove(document);
   }
 
-  async getFileStream(id: number): Promise<{ stream: fs.ReadStream; document: Document }> {
+  async getFileStream(
+    id: number,
+  ): Promise<{ stream: fs.ReadStream; document: Document }> {
     const document = await this.findOne(id);
 
     if (!fs.existsSync(document.filePath)) {

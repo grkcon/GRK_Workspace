@@ -9,10 +9,10 @@ async function seed() {
   try {
     // 기존 직원 확인
     const employees = await employeeService.findAll();
-    
+
     if (employees.length === 0) {
       console.log('Creating seed data...');
-      
+
       // 테스트 직원 데이터 생성
       await employeeService.create({
         empNo: 'GRK-001',
@@ -30,16 +30,16 @@ async function seed() {
           {
             degree: '학사',
             major: '컴퓨터공학',
-            school: '서울대학교'
-          }
+            school: '서울대학교',
+          },
         ],
         experience: [
           {
             company: '삼성전자',
             department: 'SW개발팀',
-            position: '선임연구원'
-          }
-        ]
+            position: '선임연구원',
+          },
+        ],
       });
 
       await employeeService.create({
@@ -53,7 +53,7 @@ async function seed() {
         age: 28,
         joinDate: '2021-03-01',
         monthlySalary: 3500000,
-        status: 'ACTIVE'
+        status: 'ACTIVE',
       });
 
       await employeeService.create({
@@ -67,12 +67,14 @@ async function seed() {
         age: 26,
         joinDate: '2022-06-01',
         monthlySalary: 3000000,
-        status: 'ON_LEAVE'
+        status: 'ON_LEAVE',
       });
 
       console.log('Seed data created successfully!');
     } else {
-      console.log(`Found ${employees.length} existing employees. Skipping seed.`);
+      console.log(
+        `Found ${employees.length} existing employees. Skipping seed.`,
+      );
     }
   } catch (error) {
     console.error('Error seeding data:', error);

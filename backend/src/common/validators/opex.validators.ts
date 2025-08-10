@@ -21,7 +21,7 @@ export class IsValidMonthConstraint implements ValidatorConstraintInterface {
 }
 
 export function IsValidMonth(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
@@ -47,7 +47,7 @@ export class IsValidYearConstraint implements ValidatorConstraintInterface {
 }
 
 export function IsValidYear(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
@@ -62,7 +62,9 @@ export function IsValidYear(validationOptions?: ValidationOptions) {
  * 양수 금액 검증
  */
 @ValidatorConstraint({ name: 'isPositiveAmount', async: false })
-export class IsPositiveAmountConstraint implements ValidatorConstraintInterface {
+export class IsPositiveAmountConstraint
+  implements ValidatorConstraintInterface
+{
   validate(amount: number, args: ValidationArguments) {
     return amount >= 0;
   }
@@ -73,7 +75,7 @@ export class IsPositiveAmountConstraint implements ValidatorConstraintInterface 
 }
 
 export function IsPositiveAmount(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,

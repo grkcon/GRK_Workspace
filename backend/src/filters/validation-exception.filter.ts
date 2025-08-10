@@ -16,7 +16,10 @@ export class ValidationExceptionFilter implements ExceptionFilter {
 
     console.error('=== Validation Error ===');
     console.error('Status:', status);
-    console.error('Exception Response:', JSON.stringify(exceptionResponse, null, 2));
+    console.error(
+      'Exception Response:',
+      JSON.stringify(exceptionResponse, null, 2),
+    );
     console.error('========================');
 
     response.status(status).json({

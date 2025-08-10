@@ -74,7 +74,8 @@ import { PPEModule } from './modules/ppe/ppe.module';
         EmployeeHRCost,
       ],
       synchronize: process.env.NODE_ENV === 'development',
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl:
+        process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     }),
     AuthModule,
     EmployeeModule,

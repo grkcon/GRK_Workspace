@@ -1,9 +1,19 @@
-import { Injectable, NotFoundException, ConflictException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmployeeHRCost } from '../../../entities/employee-hr-cost.entity';
 import { Employee } from '../../../entities/employee.entity';
-import { CreateEmployeeHRCostDto, UpdateEmployeeHRCostDto, EmployeeHRCostResponseDto } from '../dto/hr-cost.dto';
+import {
+  CreateEmployeeHRCostDto,
+  UpdateEmployeeHRCostDto,
+  EmployeeHRCostResponseDto,
+} from '../dto/hr-cost.dto';
 import { EmployeeService } from './employee.service';
 import axios from 'axios';
 
@@ -21,12 +31,20 @@ export class EmployeeHRCostService {
   /**
    * OPEX 데이터 조회 (HTTP 클라이언트 사용 - 순환 참조 방지)
    */
-  private async fetchOpexData(year: number, month: number): Promise<{ totalOpex: number }> {
+  private async fetchOpexData(
+    year: number,
+    month: number,
+  ): Promise<{ totalOpex: number }> {
     try {
-      const response = await axios.get(`http://localhost:3000/opex/year/${year}/month/${month}/total`);
+      const response = await axios.get(
+        `http://localhost:3000/opex/year/${year}/month/${month}/total`,
+      );
       return { totalOpex: response.data.totalOpex || 22942469 }; // 기본값 설정
     } catch (error) {
-      console.log(`OPEX 데이터 조회 실패 (${year}년 ${month}월):`, error.message);
+      console.log(
+        `OPEX 데이터 조회 실패 (${year}년 ${month}월):`,
+        error.message,
+      );
       return { totalOpex: 22942469 }; // 기본값
     }
   }
@@ -40,35 +58,51 @@ export class EmployeeHRCostService {
    */
   private getRoleMultiplier(position: string): number {
     const positionUpper = position.toUpperCase();
-    
+
     // 파트너 레벨 (EP, Partner 등)
-    if (positionUpper.includes('EP') || positionUpper.includes('PARTNER') || positionUpper.includes('임원')) {
+    if (
+      positionUpper.includes('EP') ||
+      positionUpper.includes('PARTNER') ||
+      positionUpper.includes('임원')
+    ) {
       return 3.5; // 350%
     }
-    
+
     // 관리자 레벨 (Manager, PM 등)
-    if (positionUpper.includes('MANAGER') || positionUpper.includes('PM') || 
-        positionUpper.includes('관리') || positionUpper.includes('매니저')) {
+    if (
+      positionUpper.includes('MANAGER') ||
+      positionUpper.includes('PM') ||
+      positionUpper.includes('관리') ||
+      positionUpper.includes('매니저')
+    ) {
       return 0.5; // 50%
     }
-    
+
     // 주니어 레벨 (Junior, 사원 등)
-    if (positionUpper.includes('JUNIOR') || positionUpper.includes('JR') || 
-        positionUpper.includes('사원') || positionUpper.includes('인턴')) {
+    if (
+      positionUpper.includes('JUNIOR') ||
+      positionUpper.includes('JR') ||
+      positionUpper.includes('사원') ||
+      positionUpper.includes('인턴')
+    ) {
       return 0.7; // 70%
     }
-    
+
     // PR (프로젝트 매니저는 별도 처리)
     if (positionUpper === 'PR') {
       return 1.2; // 120%
     }
-    
+
     // 시니어/선임 레벨
-    if (positionUpper.includes('SENIOR') || positionUpper.includes('SR') || 
-        positionUpper.includes('선임') || positionUpper.includes('SBA')) {
+    if (
+      positionUpper.includes('SENIOR') ||
+      positionUpper.includes('SR') ||
+      positionUpper.includes('선임') ||
+      positionUpper.includes('SBA')
+    ) {
       return 1.0; // 100%
     }
-    
+
     // 기본값
     return 1.0; // 100%
   }
@@ -87,7 +121,7 @@ export class EmployeeHRCostService {
     position: string = '',
     joinDate: Date = new Date(),
     year: number,
-    month: number
+    month: number,
   ) {
     // 1. 4대보험/퇴직금 계산 (연봉의 50%)
     const insuranceRetirement = Math.round(annualSalary * 0.5);
@@ -102,14 +136,16 @@ export class EmployeeHRCostService {
     // Excel: =IFERROR(DATEDIF(입사일, 상여금기준일, "d"), 0)
     const bonusBaseDays = this.calculateDaysDifference(
       joinDate, // 입사일
-      bonusBaseDate instanceof Date ? bonusBaseDate : new Date(bonusBaseDate) // 상여금 기준일
+      bonusBaseDate instanceof Date ? bonusBaseDate : new Date(bonusBaseDate), // 상여금 기준일
     );
 
     // 5. PS 기준일수 계산 (입사일부터 성과급기준일까지)
     // Excel: =IFERROR(DATEDIF(입사일, 성과급기준일, "d"), 0)
     const performanceBaseDays = this.calculateDaysDifference(
       joinDate, // 입사일
-      performanceBaseDate instanceof Date ? performanceBaseDate : new Date(performanceBaseDate) // 성과급 기준일
+      performanceBaseDate instanceof Date
+        ? performanceBaseDate
+        : new Date(performanceBaseDate), // 성과급 기준일
     );
 
     // 6. 상여금 비율 계산 (Excel 공식: 6개월 기준 비례 계산)
@@ -143,35 +179,43 @@ export class EmployeeHRCostService {
     // 해당 월의 실제 OPEX 데이터 가져오기
     const opexData = await this.fetchOpexData(year, month);
     const totalOpexAllocation = opexData.totalOpex;
-    
+
     // 해당 월 실제 재직 직원수 계산
     let totalEmployees = 11; // 기본값
     try {
-      totalEmployees = await this.employeeService.getActiveEmployeeCountByMonth(year, month);
+      totalEmployees = await this.employeeService.getActiveEmployeeCountByMonth(
+        year,
+        month,
+      );
       if (totalEmployees === 0) {
         totalEmployees = 11; // 직원수가 0이면 기본값 사용
       }
     } catch (error) {
       console.log(`직원수 계산 실패 (${year}년 ${month}월):`, error.message);
     }
-    
+
     const opexAllocation = Math.round(totalOpexAllocation / totalEmployees);
-    
+
     // EPS: 회사부담금액 × 30% × PS기준일비율 (Excel J6*V5*O6)
     // PS기준일비율은 현재 1로 고정 (1년 이상 근무 시)
-    const psRatio = performanceBaseDays >= 365 ? 1.0 : (performanceBaseDays / 365);
+    const psRatio =
+      performanceBaseDays >= 365 ? 1.0 : performanceBaseDays / 365;
     const eps = Math.round(companyBurden * 0.3 * psRatio);
     const monthlyEps = Math.round(eps / 12);
-    
+
     // ECM: (월인력비 + OPEX배분 + Monthly EPS) × 50% (Excel (S6+U6+W6)*X5)
-    const ecm = Math.round((monthlyLaborCost + opexAllocation + monthlyEps) * 0.5);
+    const ecm = Math.round(
+      (monthlyLaborCost + opexAllocation + monthlyEps) * 0.5,
+    );
 
     // 10. 최종 인력원가: 월인력비 + OPEX배분 + Monthly EPS + ECM (Excel Y6)
     const finalLaborCost = monthlyLaborCost + opexAllocation + monthlyEps + ecm;
 
     // 11. 역할별 조정 비율 적용 (Excel의 VLOOKUP 역할별 퍼센트)
     const roleMultiplier = this.getRoleMultiplier(position);
-    const adjustedMonthlyLaborCost = Math.round(monthlyLaborCost * roleMultiplier);
+    const adjustedMonthlyLaborCost = Math.round(
+      monthlyLaborCost * roleMultiplier,
+    );
     const adjustedFinalLaborCost = Math.round(finalLaborCost * roleMultiplier);
 
     return {
@@ -199,7 +243,7 @@ export class EmployeeHRCostService {
   /**
    * 두 날짜 간의 일수 계산 (Excel DATEDIF 함수와 동일한 로직)
    * =IFERROR(DATEDIF(startDate, endDate, "d"), 0)
-   * 
+   *
    * @param startDate 시작일
    * @param endDate 종료일
    * @returns 일수 (오류 시 0 반환)
@@ -207,8 +251,12 @@ export class EmployeeHRCostService {
   private calculateDaysDifference(startDate: Date, endDate: Date): number {
     try {
       // 날짜 유효성 검사
-      if (!startDate || !endDate || 
-          isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      if (
+        !startDate ||
+        !endDate ||
+        isNaN(startDate.getTime()) ||
+        isNaN(endDate.getTime())
+      ) {
         return 0;
       }
 
@@ -227,17 +275,19 @@ export class EmployeeHRCostService {
       const startYear = startDate.getFullYear();
       const startMonth = startDate.getMonth();
       const startDay = startDate.getDate();
-      
+
       const endYear = endDate.getFullYear();
       const endMonth = endDate.getMonth();
       const endDay = endDate.getDate();
-      
+
       // 단순한 밀리초 차이를 일수로 변환 (UTC 기준)
       const utcStart = Date.UTC(startYear, startMonth, startDay);
       const utcEnd = Date.UTC(endYear, endMonth, endDay);
-      
-      const daysDifference = Math.floor((utcEnd - utcStart) / (1000 * 60 * 60 * 24));
-      
+
+      const daysDifference = Math.floor(
+        (utcEnd - utcStart) / (1000 * 60 * 60 * 24),
+      );
+
       return daysDifference;
     } catch (error) {
       // IFERROR와 동일하게 오류 시 0 반환
@@ -255,7 +305,7 @@ export class EmployeeHRCostService {
       if (dateString instanceof Date) {
         return isNaN(dateString.getTime()) ? null : dateString;
       }
-      
+
       if (typeof dateString !== 'string') {
         return null;
       }
@@ -279,24 +329,26 @@ export class EmployeeHRCostService {
   async create(createDto: CreateEmployeeHRCostDto): Promise<EmployeeHRCost> {
     // 직원 존재 확인
     const employee = await this.employeeRepository.findOne({
-      where: { id: createDto.employeeId }
+      where: { id: createDto.employeeId },
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${createDto.employeeId} not found`);
+      throw new NotFoundException(
+        `Employee with ID ${createDto.employeeId} not found`,
+      );
     }
 
     // 중복 확인 (직원별 연도별 유니크)
     const existingHRCost = await this.hrCostRepository.findOne({
       where: {
         employee: { id: createDto.employeeId },
-        year: createDto.year
-      }
+        year: createDto.year,
+      },
     });
 
     if (existingHRCost) {
       throw new ConflictException(
-        `HR Cost data already exists for employee ${createDto.employeeId} in year ${createDto.year}`
+        `HR Cost data already exists for employee ${createDto.employeeId} in year ${createDto.year}`,
       );
     }
 
@@ -304,7 +356,7 @@ export class EmployeeHRCostService {
     const calculationDate = new Date();
     const bonusBaseDate = new Date(createDto.bonusBaseDate);
     const performanceBaseDate = new Date(createDto.performanceBaseDate);
-    
+
     const calculations = await this.calculateHRCostForMonth(
       createDto.annualSalary,
       bonusBaseDate,
@@ -316,7 +368,7 @@ export class EmployeeHRCostService {
       employee.position, // 직원의 직급/역할 정보 전달
       new Date(employee.joinDate), // 입사일 전달
       createDto.year,
-      calculationDate.getMonth() + 1 // 생성 시점의 월 기준
+      calculationDate.getMonth() + 1, // 생성 시점의 월 기준
     );
 
     // 엔티티 생성
@@ -340,19 +392,23 @@ export class EmployeeHRCostService {
   /**
    * 직원의 특정 연도-월 HR Cost 조회
    */
-  async findByEmployeeYearMonth(employeeId: number, year: number, month: number): Promise<EmployeeHRCostResponseDto> {
+  async findByEmployeeYearMonth(
+    employeeId: number,
+    year: number,
+    month: number,
+  ): Promise<EmployeeHRCostResponseDto> {
     const hrCost = await this.hrCostRepository.findOne({
       where: {
         employee: { id: employeeId },
-        year: year
+        year: year,
       },
-      relations: ['employee']
+      relations: ['employee'],
     });
 
     if (!hrCost) {
       // HR Cost 데이터가 없는 경우 기본값으로 자동 생성
       const employee = await this.employeeRepository.findOne({
-        where: { id: employeeId }
+        where: { id: employeeId },
       });
 
       if (!employee) {
@@ -360,8 +416,10 @@ export class EmployeeHRCostService {
       }
 
       // 기본값으로 HR Cost 생성
-      const defaultAnnualSalary = employee.monthlySalary ? Number(employee.monthlySalary) * 12 : 50000000;
-      
+      const defaultAnnualSalary = employee.monthlySalary
+        ? Number(employee.monthlySalary) * 12
+        : 50000000;
+
       const createDto: CreateEmployeeHRCostDto = {
         employeeId,
         year,
@@ -384,15 +442,15 @@ export class EmployeeHRCostService {
         employee2.position,
         new Date(employee2.joinDate),
         year,
-        month
+        month,
       );
-      
+
       const updatedHRCost = {
         ...newHRCost,
         ...calculations,
         calculationDate: new Date(),
       };
-      
+
       return this.formatResponse(updatedHRCost as any);
     }
 
@@ -409,7 +467,7 @@ export class EmployeeHRCostService {
       employee.position,
       new Date(employee.joinDate),
       year,
-      month
+      month,
     );
 
     // 계산된 값들 업데이트 (DB에 저장하지 않고 응답에만 반영)
@@ -425,19 +483,22 @@ export class EmployeeHRCostService {
   /**
    * 직원의 특정 연도 HR Cost 조회
    */
-  async findByEmployeeAndYear(employeeId: number, year: number): Promise<EmployeeHRCostResponseDto> {
+  async findByEmployeeAndYear(
+    employeeId: number,
+    year: number,
+  ): Promise<EmployeeHRCostResponseDto> {
     const hrCost = await this.hrCostRepository.findOne({
       where: {
         employee: { id: employeeId },
-        year: year
+        year: year,
       },
-      relations: ['employee']
+      relations: ['employee'],
     });
 
     if (!hrCost) {
       // HR Cost 데이터가 없는 경우 기본값으로 자동 생성
       const employee = await this.employeeRepository.findOne({
-        where: { id: employeeId }
+        where: { id: employeeId },
       });
 
       if (!employee) {
@@ -445,8 +506,10 @@ export class EmployeeHRCostService {
       }
 
       // 기본값으로 HR Cost 생성
-      const defaultAnnualSalary = employee.monthlySalary ? Number(employee.monthlySalary) * 12 : 50000000;
-      
+      const defaultAnnualSalary = employee.monthlySalary
+        ? Number(employee.monthlySalary) * 12
+        : 50000000;
+
       const createDto: CreateEmployeeHRCostDto = {
         employeeId,
         year,
@@ -473,7 +536,7 @@ export class EmployeeHRCostService {
       employee.position, // 직원의 직급/역할 정보 전달
       new Date(employee.joinDate), // 입사일 전달
       year,
-      currentDate.getMonth() + 1 // 현재 월 기준
+      currentDate.getMonth() + 1, // 현재 월 기준
     );
 
     // 계산된 값들 업데이트 (DB에 저장하지 않고 응답에만 반영)
@@ -489,17 +552,23 @@ export class EmployeeHRCostService {
   /**
    * HR Cost 업데이트
    */
-  async update(employeeId: number, year: number, updateDto: UpdateEmployeeHRCostDto): Promise<EmployeeHRCost> {
+  async update(
+    employeeId: number,
+    year: number,
+    updateDto: UpdateEmployeeHRCostDto,
+  ): Promise<EmployeeHRCost> {
     const hrCost = await this.hrCostRepository.findOne({
       where: {
         employee: { id: employeeId },
-        year: year
+        year: year,
       },
-      relations: ['employee']
+      relations: ['employee'],
     });
 
     if (!hrCost) {
-      throw new NotFoundException(`HR Cost not found for employee ${employeeId} in year ${year}`);
+      throw new NotFoundException(
+        `HR Cost not found for employee ${employeeId} in year ${year}`,
+      );
     }
 
     // 업데이트할 필드들
@@ -538,7 +607,7 @@ export class EmployeeHRCostService {
       hrCost.employee.position, // 직원의 직급/역할 정보 전달
       new Date(hrCost.employee.joinDate), // 입사일 전달
       year,
-      currentDate.getMonth() + 1 // 현재 월 기준
+      currentDate.getMonth() + 1, // 현재 월 기준
     );
 
     // 계산된 값들 업데이트
@@ -593,35 +662,42 @@ export class EmployeeHRCostService {
   /**
    * 직원의 모든 HR Cost 이력 조회
    */
-  async findAllByEmployee(employeeId: number): Promise<EmployeeHRCostResponseDto[]> {
+  async findAllByEmployee(
+    employeeId: number,
+  ): Promise<EmployeeHRCostResponseDto[]> {
     const hrCosts = await this.hrCostRepository.find({
       where: { employee: { id: employeeId } },
       relations: ['employee'],
-      order: { year: 'DESC' }
+      order: { year: 'DESC' },
     });
 
-    return hrCosts.map(hrCost => this.formatResponse(hrCost));
+    return hrCosts.map((hrCost) => this.formatResponse(hrCost));
   }
 
   /**
    * 모든 직원의 특정 연도/월 HR Cost 조회
    */
-  async findAllEmployeesHRCost(year: number, month: number): Promise<Array<{
-    employee: {
-      id: number;
-      name: string;
-      position: string;
-      department: string;
-      monthlySalary: string;
-    };
-    hrCost: EmployeeHRCostResponseDto;
-  }>> {
+  async findAllEmployeesHRCost(
+    year: number,
+    month: number,
+  ): Promise<
+    Array<{
+      employee: {
+        id: number;
+        name: string;
+        position: string;
+        department: string;
+        monthlySalary: string;
+      };
+      hrCost: EmployeeHRCostResponseDto;
+    }>
+  > {
     // 활성 직원 목록 조회
     const activeEmployees = await this.employeeRepository.find({
-      where: { 
-        status: 'ACTIVE' as any
+      where: {
+        status: 'ACTIVE' as any,
       },
-      order: { name: 'ASC' }
+      order: { name: 'ASC' },
     });
 
     const results: Array<{
@@ -634,12 +710,16 @@ export class EmployeeHRCostService {
       };
       hrCost: EmployeeHRCostResponseDto;
     }> = [];
-    
+
     for (const employee of activeEmployees) {
       try {
         // 각 직원의 HR Cost 계산
-        const hrCost = await this.findByEmployeeYearMonth(employee.id, year, month);
-        
+        const hrCost = await this.findByEmployeeYearMonth(
+          employee.id,
+          year,
+          month,
+        );
+
         results.push({
           employee: {
             id: employee.id,
@@ -648,10 +728,13 @@ export class EmployeeHRCostService {
             department: employee.department,
             monthlySalary: String(employee.monthlySalary || '0'),
           },
-          hrCost
+          hrCost,
         });
       } catch (error) {
-        console.error(`HR Cost 계산 실패 - 직원: ${employee.name} (ID: ${employee.id}):`, error.message);
+        console.error(
+          `HR Cost 계산 실패 - 직원: ${employee.name} (ID: ${employee.id}):`,
+          error.message,
+        );
         // 에러가 발생해도 다른 직원들은 계속 처리
         continue;
       }

@@ -1,4 +1,10 @@
-import { IsNumber, IsOptional, Min, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  Min,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OpexItemDto {
