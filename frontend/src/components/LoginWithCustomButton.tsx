@@ -1,22 +1,51 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LoginWithCustomButtonProps {
   clientId: string;
-  onLoginSuccess: () => void;
 }
 
-const LoginButton: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
+const LoginButton: React.FC = () => {
+  const { googleLogin } = useAuth();
+  const navigate = useNavigate();
+
+  // Mock 로그인 제거됨
+
   const login = useGoogleLogin({
-    onSuccess: (tokenResponse) => {
-      console.log('Login Success:', tokenResponse);
-      // TODO: Backend API로 토큰 전송 및 JWT 받기
-      onSuccess();
+    onSuccess: async (tokenResponse: any) => {
+      try {
+        console.log('Google OAuth Success:', tokenResponse);
+        
+        // Access Token으로 Google API에서 사용자 정보 가져오기
+        const userInfoResponse = await fetch(
+          `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenResponse.access_token}`
+        );
+        const userInfo = await userInfoResponse.json();
+        console.log('User Info:', userInfo);
+        
+        // 도메인 검증을 프론트엔드에서도 수행
+        if (!userInfo.email?.endsWith('@grkcon.com')) {
+          alert('grkcon.com 도메인 이메일만 로그인 가능합니다.');
+          return;
+        }
+        
+        console.log('실제 Google 사용자 정보:', userInfo);
+        
+        await googleLogin(tokenResponse.access_token);
+        navigate('/');
+      } catch (error: any) {
+        console.error('Login failed:', error);
+        alert('로그인에 실패했습니다. 다시 시도해주세요.');
+      }
     },
-    onError: () => {
-      console.error('Login Failed');
+    onError: (error) => {
+      console.error('Google OAuth Failed:', error);
+      alert('Google 로그인에 실패했습니다. 다시 시도해주세요.');
     },
+    scope: 'email profile',
   });
 
   return (
@@ -36,25 +65,37 @@ const LoginButton: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
   );
 };
 
-const LoginWithCustomButton: React.FC<LoginWithCustomButtonProps> = ({ clientId, onLoginSuccess }) => {
+const LoginWithCustomButton: React.FC<LoginWithCustomButtonProps> = ({ clientId }) => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  // 디버깅: clientId 확인
+  console.log('LoginWithCustomButton received clientId:', clientId);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
   return (
     <GoogleOAuthProvider clientId={clientId}>
       <div className="flex items-center justify-center min-h-screen bg-slate-100 px-4">
         <div className="w-full max-w-md mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-slate-800">GRK Workspace</h1>
+            <p className="text-slate-600 mt-2">관리 시스템</p>
           </div>
 
           {/* 로그인 카드 */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-8 md:p-10">
             <div className="text-center">
               <h2 className="text-xl font-semibold text-slate-700">로그인</h2>
-              <p className="text-sm text-slate-500 mt-1">Google 계정으로 시작하세요.</p>
+              <p className="text-sm text-slate-500 mt-1">@grkcon.com 계정으로 로그인하세요</p>
             </div>
 
             {/* 커스텀 구글 로그인 버튼 */}
             <div className="mt-8">
-              <LoginButton onSuccess={onLoginSuccess} />
+              <LoginButton />
             </div>
           </div>
           

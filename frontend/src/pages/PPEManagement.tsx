@@ -1,51 +1,48 @@
-import React, { useState } from 'react';
-import { Project, ProjectPPE } from '../types/ppe';
+import React, { useState, useEffect } from 'react';
+import { Project, ProjectPPE as ProjectPPEFromTypes } from '../types/ppe';
+import { Project as BackendProject, projectApi, ProjectStatus } from '../services/projectApi';
 import PPEDetailPanel from '../components/PPEDetailPanel';
 import NewProjectModal from '../components/NewProjectModal';
 
 const PPEManagement: React.FC = () => {
-  const [projects] = useState<Project[]>([
-    { 
-      id: 101, 
-      name: 'SCL LIS 시스템 ISP', 
-      client: 'SCL', 
-      startDate: '2025-08-16', 
-      endDate: '2026-02-28', 
-      pm: '박영훈', 
-      contractValue: 90000000, 
-      status: '진행중' 
-    },
-    { 
-      id: 102, 
-      name: '휴니버스 PMI', 
-      client: 'Huniverse', 
-      startDate: '2025-07-01', 
-      endDate: '2025-12-31', 
-      pm: '윤승현', 
-      contractValue: 30000000, 
-      status: '완료' 
-    },
-  ]);
+  const [projects, setProjects] = useState<BackendProject[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [selectedProject, setSelectedProject] = useState<Project | undefined>();
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+      const data = await projectApi.getAll();
+      setProjects(data);
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [selectedProject, setSelectedProject] = useState<BackendProject | undefined>();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [ppeDataMap, setPpeDataMap] = useState<Map<number, ProjectPPE>>(new Map());
+  const [ppeDataMap, setPpeDataMap] = useState<Map<number, ProjectPPEFromTypes>>(new Map());
 
   const formatCurrency = (num: number) => {
     return new Intl.NumberFormat('ko-KR').format(Math.round(num));
   };
 
-  const getStatusStyle = (status: string) => {
+  const getStatusStyle = (status: ProjectStatus) => {
     const styles = {
-      '진행중': 'bg-blue-100 text-blue-800',
-      '완료': 'bg-green-100 text-green-800',
-      '계획': 'bg-slate-200 text-slate-600'
+      [ProjectStatus.ONGOING]: 'bg-blue-100 text-blue-800',
+      [ProjectStatus.COMPLETED]: 'bg-green-100 text-green-800',
+      [ProjectStatus.PLANNED]: 'bg-slate-200 text-slate-600'
     };
-    return styles[status as keyof typeof styles] || 'bg-slate-100 text-slate-800';
+    return styles[status] || 'bg-slate-100 text-slate-800';
   };
 
-  const openDetailPanel = (project: Project) => {
+  const openDetailPanel = (project: BackendProject) => {
     setSelectedProject(project);
     setIsPanelOpen(true);
   };
@@ -55,18 +52,26 @@ const PPEManagement: React.FC = () => {
     setSelectedProject(undefined);
   };
 
-  const handleSavePPE = (updatedData: ProjectPPE) => {
+  const handleSavePPE = (updatedData: ProjectPPEFromTypes) => {
     setPpeDataMap(prev => {
       const newMap = new Map(prev);
-      newMap.set(updatedData.projectId, updatedData);
+      // updatedData.project?.id를 사용하거나, project가 없으면 id를 직접 사용
+      const projectId = updatedData.project?.id || updatedData.id;
+      if (projectId) {
+        newMap.set(projectId, updatedData);
+      }
       return newMap;
     });
   };
 
-  const handleSaveNewProject = (newProject: Partial<Project>) => {
-    // TODO: 새 프로젝트 저장 로직
-    console.log('새 프로젝트:', newProject);
-    setIsModalOpen(false);
+  const handleSaveNewProject = async (newProject: any) => {
+    try {
+      await projectApi.create(newProject);
+      await fetchProjects(); // 프로젝트 목록 새로고침
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    }
   };
 
   return (
@@ -100,27 +105,41 @@ const PPEManagement: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="text-slate-700">
-                {projects.map((project) => (
-                  <tr
-                    key={project.id}
-                    className="border-t border-slate-200 hover:bg-slate-50 cursor-pointer"
-                    onClick={() => openDetailPanel(project)}
-                  >
-                    <td className="px-6 py-4 font-semibold text-slate-900">{project.name}</td>
-                    <td className="px-6 py-4">{project.client}</td>
-                    <td className="px-6 py-4">{project.startDate}</td>
-                    <td className="px-6 py-4">{project.endDate}</td>
-                    <td className="px-6 py-4">{project.pm}</td>
-                    <td className="px-6 py-4 text-right font-semibold">
-                      {formatCurrency(project.contractValue)} 원
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(project.status)}`}>
-                        {project.status}
-                      </span>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                      로딩 중...
                     </td>
                   </tr>
-                ))}
+                ) : projects.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                      프로젝트가 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  projects.map((project) => (
+                    <tr
+                      key={project.id}
+                      className="border-t border-slate-200 hover:bg-slate-50 cursor-pointer"
+                      onClick={() => openDetailPanel(project)}
+                    >
+                      <td className="px-6 py-4 font-semibold text-slate-900">{project.name}</td>
+                      <td className="px-6 py-4">{project.client}</td>
+                      <td className="px-6 py-4">{new Date(project.startDate).toLocaleDateString('ko-KR')}</td>
+                      <td className="px-6 py-4">{new Date(project.endDate).toLocaleDateString('ko-KR')}</td>
+                      <td className="px-6 py-4">{project.pm}</td>
+                      <td className="px-6 py-4 text-right font-semibold">
+                        {formatCurrency(typeof project.contractValue === 'string' ? parseFloat(project.contractValue) : project.contractValue)} 원
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(project.status)}`}>
+                          {project.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

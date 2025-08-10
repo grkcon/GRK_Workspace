@@ -60,30 +60,30 @@ export interface MonthlyCashFlowSummary {
 
 export const cashflowApi = {
   getAll: (): Promise<CashFlow[]> => {
-    return apiClient.get<CashFlow[]>('/cashflows');
+    return apiClient.get<CashFlow[]>('/cashflow');
   },
 
   getById: (id: number): Promise<CashFlow> => {
-    return apiClient.get<CashFlow>(`/cashflows/${id}`);
+    return apiClient.get<CashFlow>(`/cashflow/${id}`);
   },
 
   getByYear: (year: number): Promise<CashFlow[]> => {
-    return apiClient.get<CashFlow[]>(`/cashflows/year/${year}`);
+    return apiClient.get<CashFlow[]>(`/cashflow?year=${year}`);
   },
 
   getMonthlySummary: (year: number, month: number): Promise<MonthlyCashFlowSummary> => {
-    return apiClient.get<MonthlyCashFlowSummary>(`/cashflows/monthly/${year}/${month}`);
+    return apiClient.get<MonthlyCashFlowSummary>(`/cashflow/calculate/${year}/${month}`);
   },
 
   create: (cashflow: CreateCashFlowDto): Promise<CashFlow> => {
-    return apiClient.post<CashFlow>('/cashflows', cashflow);
+    return apiClient.post<CashFlow>('/cashflow', cashflow);
   },
 
   update: (id: number, cashflow: UpdateCashFlowDto): Promise<CashFlow> => {
-    return apiClient.put<CashFlow>(`/cashflows/${id}`, cashflow);
+    return apiClient.patch<CashFlow>(`/cashflow/${id}`, cashflow);
   },
 
   delete: (id: number): Promise<void> => {
-    return apiClient.delete<void>(`/cashflows/${id}`);
+    return apiClient.delete<void>(`/cashflow/${id}`);
   },
 };

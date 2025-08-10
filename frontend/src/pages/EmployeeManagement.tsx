@@ -1,15 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Employee } from '../types/employee';
 import { employeeApi } from '../services/employeeApi';
-import EmployeeForm, { getEmployeeFormData } from '../components/EmployeeForm';
+import EmployeeForm, { EmployeeFormData } from '../components/EmployeeForm';
 import LeaveModal, { LeaveRequestData } from '../components/LeaveModal';
 import ReturnModal, { ReturnRequestData } from '../components/ReturnModal';
 import ResignationModal, { ResignationRequestData } from '../components/ResignationModal';
+import EmployeeDetailModal from '../components/EmployeeDetailModal';
+import AllEmployeesHRCostModal from '../components/AllEmployeesHRCostModal';
+import SortIcon from '../components/SortIcon';
+import { useSort } from '../hooks/useSort';
 
 const EmployeeManagement: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // 부서 필터링 상태 추가
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  
+  // 삭제된 직원 보기 상태 추가
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedEmployees, setDeletedEmployees] = useState<Employee[]>([]);
+
+  // 정렬 기능 추가  
+  const currentEmployees = showDeleted ? deletedEmployees : employees;
+  const { sortedData: sortedEmployees, requestSort, getSortDirection } = useSort(currentEmployees);
+
+  // 필터링된 직원 목록
+  const filteredEmployees = selectedDepartment 
+    ? sortedEmployees.filter(emp => emp.department === selectedDepartment)
+    : sortedEmployees;
 
   const [isEditing, setIsEditing] = useState(false);
   const [mode, setMode] = useState<'view' | 'edit' | 'new'>('view');
@@ -18,6 +38,9 @@ const EmployeeManagement: React.FC = () => {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isResignationModalOpen, setIsResignationModalOpen] = useState(false);
+  const [isHRDetailModalOpen, setIsHRDetailModalOpen] = useState(false);
+  const [hrDetailEmployee, setHRDetailEmployee] = useState<Employee | undefined>();
+  const [isAllHRCostModalOpen, setIsAllHRCostModalOpen] = useState(false);
 
   useEffect(() => {
     fetchEmployees();
@@ -37,6 +60,52 @@ const EmployeeManagement: React.FC = () => {
     }
   };
 
+  const fetchDeletedEmployees = async () => {
+    try {
+      const data = await employeeApi.getDeleted();
+      setDeletedEmployees(data);
+    } catch (err) {
+      console.error('Failed to fetch deleted employees:', err);
+      setError('삭제된 직원 목록을 불러오는데 실패했습니다.');
+    }
+  };
+
+  const handleDeleteEmployee = async (employeeId: number) => {
+    if (!window.confirm('정말로 이 직원을 삭제하시겠습니까? 삭제된 직원은 나중에 복원할 수 있습니다.')) {
+      return;
+    }
+
+    try {
+      await employeeApi.delete(employeeId);
+      await fetchEmployees();
+      if (showDeleted) {
+        await fetchDeletedEmployees();
+      }
+      closePanel();
+      alert('직원이 삭제되었습니다.');
+    } catch (err) {
+      console.error('Failed to delete employee:', err);
+      alert('직원 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleRestoreEmployee = async (employeeId: number) => {
+    if (!window.confirm('이 직원을 복원하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      await employeeApi.restore(employeeId);
+      await fetchEmployees();
+      await fetchDeletedEmployees();
+      closePanel();
+      alert('직원이 복원되었습니다.');
+    } catch (err) {
+      console.error('Failed to restore employee:', err);
+      alert('직원 복원에 실패했습니다.');
+    }
+  };
+
   const openPanel = (panelMode: 'view' | 'edit' | 'new', employee?: Employee) => {
     setMode(panelMode);
     setSelectedEmployee(employee);
@@ -50,6 +119,16 @@ const EmployeeManagement: React.FC = () => {
     setSelectedEmployee(undefined);
   };
 
+  const openHRDetailModal = (employee: Employee) => {
+    setHRDetailEmployee(employee);
+    setIsHRDetailModalOpen(true);
+  };
+
+  const closeHRDetailModal = () => {
+    setIsHRDetailModalOpen(false);
+    setHRDetailEmployee(undefined);
+  };
+
   const setEditMode = (editing: boolean) => {
     setIsEditing(editing);
     if (editing && mode === 'view') {
@@ -59,27 +138,100 @@ const EmployeeManagement: React.FC = () => {
     }
   };
 
-  const saveEmployee = async () => {
+  const saveEmployee = async (formData: EmployeeFormData) => {
     try {
-      const formData = getEmployeeFormData();
-      if (!formData) {
-        setError('폼 데이터를 가져올 수 없습니다.');
-        return;
-      }
-
       if (mode === 'new') {
-        console.log('Creating new employee...', formData);
-        await employeeApi.create(formData);
+        // 새 직원 생성 시 사번 필드 제거 (백엔드에서 자동 생성)
+        const { empNo, ...createData } = formData;
+        
+        // EmployeeFormData를 CreateEmployeeDto로 변환
+        const employeeData: any = {
+          ...createData,
+          // 숫자 필드들을 올바른 타입으로 변환
+          age: createData.age ? Number(createData.age) : undefined,
+          monthlySalary: createData.monthlySalary && createData.monthlySalary.trim() !== '' ? Math.round(Number(createData.monthlySalary.toString().replace(/,/g, '')) / 12) : undefined,
+          // 빈 날짜 문자열 처리
+          endDate: createData.endDate && createData.endDate.trim() !== '' ? createData.endDate : undefined
+        };
+
+        // 빈 배열이 아닌 경우에만 education 필드 추가
+        if (createData.education && createData.education.length > 0) {
+          employeeData.education = createData.education.map(edu => ({
+            school: edu.school,
+            major: edu.major,
+            degree: edu.degree,
+            startDate: edu.startDate && edu.startDate.trim() !== '' ? edu.startDate : undefined,
+            graduationDate: edu.graduationDate && edu.graduationDate.trim() !== '' ? edu.graduationDate : undefined
+          }));
+        }
+
+        // 빈 배열이 아닌 경우에만 experience 필드 추가
+        if (createData.experience && createData.experience.length > 0) {
+          employeeData.experience = createData.experience.map(exp => ({
+            company: exp.company,
+            department: exp.department,
+            position: exp.position,
+            startDate: exp.startDate && exp.startDate.trim() !== '' ? exp.startDate : undefined,
+            endDate: exp.endDate && exp.endDate.trim() !== '' ? exp.endDate : undefined,
+            annualSalary: exp.annualSalary && exp.annualSalary.trim() !== '' ? Number(exp.annualSalary.toString().replace(/,/g, '')) : undefined
+          }));
+        }
+        
+        console.log('Creating new employee...');
+        console.log('Original form data:', formData);
+        console.log('Processed employee data:', employeeData);
+        console.log('Employee data keys:', Object.keys(employeeData));
+        console.log('Employee data JSON:', JSON.stringify(employeeData, null, 2));
+        
+        await employeeApi.create(employeeData);
+        console.log('Employee created successfully');
       } else if (mode === 'edit' && selectedEmployee) {
         console.log('Updating employee...', formData);
-        const { education, experience, ...updateData } = formData;
+        console.log('Selected employee ID:', selectedEmployee.id);
+        
+        // 수정 시에는 모든 데이터를 보내되, 기존 상태 유지
+        const updateData: any = {
+          ...formData,
+          status: selectedEmployee.status, // 기존 상태 유지
+          // 숫자 필드들을 올바른 타입으로 변환
+          age: formData.age ? Number(formData.age) : undefined,
+          monthlySalary: formData.monthlySalary && formData.monthlySalary.trim() !== '' ? Math.round(Number(formData.monthlySalary.toString().replace(/,/g, '')) / 12) : undefined,
+          // 빈 날짜 문자열 처리
+          endDate: formData.endDate && formData.endDate.trim() !== '' ? formData.endDate : undefined
+        };
+
+        // 빈 배열이 아닌 경우에만 education 필드 추가
+        if (formData.education && formData.education.length > 0) {
+          updateData.education = formData.education.map(edu => ({
+            school: edu.school,
+            major: edu.major,
+            degree: edu.degree,
+            startDate: edu.startDate && edu.startDate.trim() !== '' ? edu.startDate : undefined,
+            graduationDate: edu.graduationDate && edu.graduationDate.trim() !== '' ? edu.graduationDate : undefined
+          }));
+        }
+
+        // 빈 배열이 아닌 경우에만 experience 필드 추가
+        if (formData.experience && formData.experience.length > 0) {
+          updateData.experience = formData.experience.map(exp => ({
+            company: exp.company,
+            department: exp.department,
+            position: exp.position,
+            startDate: exp.startDate && exp.startDate.trim() !== '' ? exp.startDate : undefined,
+            endDate: exp.endDate && exp.endDate.trim() !== '' ? exp.endDate : undefined,
+            annualSalary: exp.annualSalary && exp.annualSalary.trim() !== '' ? Number(exp.annualSalary.toString().replace(/,/g, '')) : undefined
+          }));
+        }
+        
         await employeeApi.update(selectedEmployee.id, updateData);
+        console.log('Employee updated successfully');
       }
       closePanel();
       await fetchEmployees(); // Refresh the list
     } catch (err) {
       console.error('Failed to save employee:', err);
-      setError('직원 정보 저장에 실패했습니다.');
+      console.error('Error details:', err);
+      setError(`직원 정보 저장에 실패했습니다: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
     }
   };
 
@@ -151,6 +303,42 @@ const EmployeeManagement: React.FC = () => {
     return statusText[status as keyof typeof statusText] || status;
   };
 
+  const getDepartmentStats = () => {
+    const departmentCounts: { [key: string]: number } = {};
+    
+    sortedEmployees.forEach(employee => {
+      const dept = employee.department || '미정';
+      departmentCounts[dept] = (departmentCounts[dept] || 0) + 1;
+    });
+
+    return Object.entries(departmentCounts)
+      .map(([department, count]) => ({ 
+        department, 
+        count,
+        isSelected: selectedDepartment === department
+      }))
+      .sort((a, b) => b.count - a.count); // 직원수 많은 순으로 정렬
+  };
+
+  const handleDepartmentFilter = (department: string) => {
+    if (selectedDepartment === department) {
+      // 이미 선택된 부서를 클릭하면 필터 해제
+      setSelectedDepartment(null);
+    } else {
+      // 새로운 부서 선택
+      setSelectedDepartment(department);
+    }
+  };
+
+  const toggleDeletedView = async () => {
+    if (!showDeleted) {
+      // 삭제된 직원들을 보여주기 전에 데이터 로드
+      await fetchDeletedEmployees();
+    }
+    setShowDeleted(!showDeleted);
+    setSelectedDepartment(null); // 필터 초기화
+  };
+
   return (
     <>
       {/* 메인 영역 */}
@@ -158,17 +346,91 @@ const EmployeeManagement: React.FC = () => {
         <header className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">직원 관리</h1>
-            <p className="text-slate-500 mt-1">전체 직원의 정보를 관리합니다.</p>
+            <div className="flex items-center gap-4 mt-2">
+              <p className="text-slate-500">
+                {showDeleted
+                  ? selectedDepartment 
+                    ? `${selectedDepartment} 부서의 삭제된 직원을 관리합니다.` 
+                    : '삭제된 직원들을 관리합니다.'
+                  : selectedDepartment 
+                    ? `${selectedDepartment} 부서의 직원을 관리합니다.` 
+                    : '전체 직원의 정보를 관리합니다.'
+                }
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  {selectedDepartment ? `${filteredEmployees.length}명` : `총 ${sortedEmployees.length}명`}
+                  {selectedDepartment && (
+                    <button
+                      onClick={() => setSelectedDepartment(null)}
+                      className="ml-1 hover:bg-indigo-200 rounded-full p-0.5"
+                      title="필터 해제"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </span>
+                {getDepartmentStats().map((stat, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleDepartmentFilter(stat.department)}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer hover:bg-slate-200 ${
+                      stat.isSelected 
+                        ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-200' 
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                    title={`${stat.department} 부서만 보기`}
+                  >
+                    {stat.department} {stat.count}명
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => openPanel('new')}
-            className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" />
-            </svg>
-            직원 추가
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleDeletedView}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 flex items-center ${
+                showDeleted
+                  ? 'text-white bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                  : 'text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 focus:ring-slate-500'
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                {showDeleted ? (
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                ) : (
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                )}
+              </svg>
+              {showDeleted ? '활성 직원 보기' : '삭제된 직원 보기'}
+            </button>
+            {!showDeleted && (
+              <>
+                <button
+                  onClick={() => setIsAllHRCostModalOpen(true)}
+                  className="px-4 py-2 text-sm font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-lg shadow-sm hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.51-1.31c-.562-.649-1.413-1.076-2.353-1.253V5z" clipRule="evenodd" />
+                  </svg>
+                  HR Cost 현황
+                </button>
+                <button
+                  onClick={() => openPanel('new')}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" />
+                  </svg>
+                  직원 추가
+                </button>
+              </>
+            )}
+          </div>
         </header>
         
         {error && (
@@ -182,9 +444,28 @@ const EmployeeManagement: React.FC = () => {
             <div className="p-8 text-center">
               <p className="text-slate-500">직원 목록을 불러오는 중...</p>
             </div>
-          ) : employees.length === 0 ? (
+          ) : currentEmployees.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-slate-500">등록된 직원이 없습니다.</p>
+              <div className="mb-4">
+                <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {showDeleted ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                  )}
+                </svg>
+              </div>
+              <p className="text-slate-500 text-lg font-medium mb-2">
+                {showDeleted ? '삭제된 직원이 없습니다' : '등록된 직원이 없습니다'}
+              </p>
+              <p className="text-slate-400 text-sm">
+                {showDeleted ? '삭제된 직원들이 여기에 표시됩니다.' : '새 직원을 추가해서 시작해보세요.'}
+              </p>
+              <div className="mt-4">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-600">
+                  총 0명
+                </span>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -192,26 +473,76 @@ const EmployeeManagement: React.FC = () => {
                 <thead className="text-xs text-slate-500 uppercase bg-slate-50">
                   <tr>
                     <th className="px-6 py-3 font-medium text-left w-min">사진</th>
-                    <th className="px-6 py-3 font-medium text-left">이름</th>
-                    <th className="px-6 py-3 font-medium text-left">사번</th>
+                    <th className="px-6 py-3 font-medium text-left">
+                      <button
+                        className="group flex items-center space-x-1 hover:text-slate-700 transition-colors"
+                        onClick={() => requestSort('name')}
+                      >
+                        <span>이름</span>
+                        <SortIcon direction={getSortDirection('name')} />
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 font-medium text-left">
+                      <button
+                        className="group flex items-center space-x-1 hover:text-slate-700 transition-colors"
+                        onClick={() => requestSort('empNo')}
+                      >
+                        <span>사번</span>
+                        <SortIcon direction={getSortDirection('empNo')} />
+                      </button>
+                    </th>
                     <th className="px-6 py-3 font-medium text-left">직급</th>
-                    <th className="px-6 py-3 font-medium text-left">부서</th>
-                    <th className="px-6 py-3 font-medium text-left">상태</th>
-                    <th className="px-6 py-3 font-medium text-left">입사일</th>
+                    <th className="px-6 py-3 font-medium text-left">
+                      <button
+                        className="group flex items-center space-x-1 hover:text-slate-700 transition-colors"
+                        onClick={() => requestSort('department')}
+                      >
+                        <span>부서</span>
+                        <SortIcon direction={getSortDirection('department')} />
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 font-medium text-left">
+                      <button
+                        className="group flex items-center space-x-1 hover:text-slate-700 transition-colors"
+                        onClick={() => requestSort('status')}
+                      >
+                        <span>상태</span>
+                        <SortIcon direction={getSortDirection('status')} />
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 font-medium text-left">
+                      <button
+                        className="group flex items-center space-x-1 hover:text-slate-700 transition-colors"
+                        onClick={() => requestSort('joinDate')}
+                      >
+                        <span>입사일</span>
+                        <SortIcon direction={getSortDirection('joinDate')} />
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 font-medium text-center">작업</th>
                   </tr>
                 </thead>
                 <tbody className="text-slate-700">
-                  {employees.map((employee) => (
+                  {filteredEmployees.map((employee) => (
                     <tr
                       key={employee.id}
-                      className="border-t border-slate-200 hover:bg-slate-50 cursor-pointer"
+                      className={`border-t border-slate-200 hover:bg-slate-50 cursor-pointer ${
+                        showDeleted ? 'bg-red-50 opacity-75' : ''
+                      }`}
                       onClick={() => openPanel('view', employee)}
                     >
                       <td className="px-6 py-3">
                         <img
-                          className="h-10 w-10 rounded-full object-cover"
-                          src={`https://placehold.co/40x40/E2E8F0/4A5568?text=${employee.name.charAt(0)}`}
+                          className="h-10 w-10 rounded-full object-cover border border-slate-200"
+                          src={employee.profileImageUrl 
+                            ? `http://localhost:3001${employee.profileImageUrl}` 
+                            : `https://placehold.co/40x40/E2E8F0/4A5568?text=${employee.name.charAt(0)}`
+                          }
                           alt={employee.name}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = `https://placehold.co/40x40/E2E8F0/4A5568?text=${employee.name.charAt(0)}`;
+                          }}
                         />
                       </td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{employee.name}</td>
@@ -226,10 +557,22 @@ const EmployeeManagement: React.FC = () => {
                       <td className="px-6 py-4">
                         {new Date(employee.joinDate).toLocaleDateString('ko-KR')}
                       </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // 행 클릭 이벤트 방지
+                            openHRDetailModal(employee);
+                          }}
+                          className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors"
+                        >
+                          HR Cost
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              
             </div>
           )}
         </div>
@@ -259,86 +602,67 @@ const EmployeeManagement: React.FC = () => {
                 employee={selectedEmployee}
                 isEditing={isEditing}
                 mode={mode}
+                onSubmit={saveEmployee}
+                onCancel={closePanel}
               />
             </div>
-            <footer className="h-16 flex-shrink-0 bg-slate-50 border-t border-slate-200 flex items-center justify-end px-6 space-x-2">
-              {/* 뷰 모드 버튼 */}
-              {mode === 'view' && (
-                <>
-                  {selectedEmployee?.status === 'ON_LEAVE' ? (
+            {/* 뷰 모드일 때만 footer 표시 */}
+            {mode === 'view' && (
+              <footer className="h-16 flex-shrink-0 bg-slate-50 border-t border-slate-200 flex items-center justify-end px-6 space-x-2">
+                {showDeleted ? (
+                  // 삭제된 직원 보기 모드일 때 복원 버튼
+                  <button
+                    type="button"
+                    onClick={() => selectedEmployee && handleRestoreEmployee(selectedEmployee.id)}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700"
+                  >
+                    복원
+                  </button>
+                ) : (
+                  // 일반 모드일 때 기존 버튼들
+                  <>
+                    {selectedEmployee?.status === 'ON_LEAVE' ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsReturnModalOpen(true)}
+                        className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                      >
+                        복직 신청
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsLeaveModalOpen(true)}
+                        className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                      >
+                        휴직 신청
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setIsReturnModalOpen(true)}
+                      onClick={() => setIsResignationModalOpen(true)}
                       className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
                     >
-                      복직 신청
+                      퇴사 신청
                     </button>
-                  ) : (
                     <button
                       type="button"
-                      onClick={() => setIsLeaveModalOpen(true)}
-                      className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                      onClick={() => selectedEmployee && handleDeleteEmployee(selectedEmployee.id)}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700"
                     >
-                      휴직 신청
+                      삭제
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setIsResignationModalOpen(true)}
-                    className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-                  >
-                    퇴사 신청
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditMode(true)}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-                  >
-                    수정
-                  </button>
-                </>
-              )}
-              
-              {/* 편집 모드 버튼 */}
-              {mode === 'edit' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditMode(false)}
-                    className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveEmployee}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-                  >
-                    저장
-                  </button>
-                </>
-              )}
-              
-              {/* 추가 모드 버튼 */}
-              {mode === 'new' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={closePanel}
-                    className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveEmployee}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-                  >
-                    등록
-                  </button>
-                </>
-              )}
-            </footer>
+                    <button
+                      type="button"
+                      onClick={() => setEditMode(true)}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+                    >
+                      수정
+                    </button>
+                  </>
+                )}
+              </footer>
+            )}
           </div>
         </div>
       )}
@@ -363,6 +687,19 @@ const EmployeeManagement: React.FC = () => {
         onClose={() => setIsResignationModalOpen(false)}
         employee={selectedEmployee}
         onSubmit={handleResignationRequest}
+      />
+
+      {/* HR Cost 상세 모달 */}
+      <EmployeeDetailModal
+        isOpen={isHRDetailModalOpen}
+        onClose={closeHRDetailModal}
+        employee={hrDetailEmployee}
+      />
+
+      {/* 전체 직원 HR Cost 현황 모달 */}
+      <AllEmployeesHRCostModal
+        isOpen={isAllHRCostModalOpen}
+        onClose={() => setIsAllHRCostModalOpen(false)}
       />
 
     </>

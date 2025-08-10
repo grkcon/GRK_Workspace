@@ -6,6 +6,8 @@ import { LeaveRequest } from './leave-request.entity';
 import { LeaveBalance } from './leave-balance.entity';
 import { HRUnitCost } from './hr-unit-cost.entity';
 import { InternalStaff } from './internal-staff.entity';
+import { Document } from './document.entity';
+import { EmployeeHRCost } from './employee-hr-cost.entity';
 
 export enum EmployeeStatus {
   ACTIVE = 'ACTIVE',
@@ -37,7 +39,7 @@ export class Employee extends BaseEntity {
   @Column({ type: 'int', nullable: true })
   age?: number; // 나이
 
-  @Column({ type: 'decimal', precision: 10, scale: 0, nullable: true })
+  @Column({ type: 'decimal', precision: 15, scale: 0, nullable: true })
   monthlySalary?: number; // 월급
 
   @Column({
@@ -56,14 +58,20 @@ export class Employee extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   email: string;
 
+  @Column({ type: 'text', nullable: true })
+  profileImageUrl?: string; // 프로필 이미지 URL
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   ssn?: string; // 주민등록번호 (암호화 필요)
 
-  @Column({ type: 'decimal', precision: 10, scale: 0, nullable: true })
-  salary?: number; // 급여
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  bankName?: string; // 은행명
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   bankAccount?: string; // 계좌번호
+
+  @Column({ type: 'text', nullable: true })
+  consultantIntroduction?: string; // 컨설턴트 소개 (500자)
 
   @OneToMany(() => Education, (education) => education.employee, {
     cascade: true,
@@ -90,4 +98,14 @@ export class Employee extends BaseEntity {
 
   @OneToMany(() => InternalStaff, (internalStaff) => internalStaff.employee)
   projectAssignments: InternalStaff[];
+
+  @OneToMany(() => Document, (document) => document.employee, {
+    cascade: true,
+  })
+  documents: Document[];
+
+  @OneToMany(() => EmployeeHRCost, (hrCost) => hrCost.employee, {
+    cascade: true,
+  })
+  hrCosts: EmployeeHRCost[];
 }

@@ -31,10 +31,10 @@ export class LeaveRequest extends BaseEntity {
   endDate: Date;
 
   @Column({ type: 'decimal', precision: 3, scale: 1 })
-  days: number; // 사용일수
+  days: number;
 
   @Column({ type: 'text' })
-  reason: string; // 사유
+  reason: string;
 
   @Column({
     type: 'enum',
@@ -43,14 +43,14 @@ export class LeaveRequest extends BaseEntity {
   })
   status: RequestStatus;
 
-  @Column({ type: 'date', default: () => 'CURRENT_DATE' })
-  requestDate: Date; // 신청일
+  @Column({ type: 'date' })
+  requestDate: Date;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  approver?: string; // 승인자
+  approver?: string;
 
   @Column({ type: 'text', nullable: true })
-  rejectReason?: string; // 반려사유
+  rejectReason?: string;
 
   @ManyToOne(() => Employee, (employee) => employee.leaveRequests, {
     onDelete: 'CASCADE',

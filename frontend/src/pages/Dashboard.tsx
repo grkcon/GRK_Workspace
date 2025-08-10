@@ -26,17 +26,24 @@ const Dashboard: React.FC = () => {
         employeeApi.getActive(),
       ]);
 
-      // OPEX 요약 데이터 가져오기
-      const opexSummary = await opexApi.getSummary();
-      const monthlyOpexTotal = opexSummary.reduce((sum, item) => sum + item.totalAmount, 0);
+      // OPEX 요약 데이터 가져오기 (현재 연도 기준)
+      const currentYear = new Date().getFullYear();
+      let monthlyOpexTotal = 0;
+      try {
+        const opexSummary = await opexApi.getSummary(currentYear);
+        monthlyOpexTotal = opexSummary.reduce((sum, item) => sum + item.totalAmount, 0);
+      } catch (err) {
+        console.log('No OPEX data available for current year');
+      }
 
-      // 현재 월 현금흐름 가져오기 (예시로 2025년 1월)
+      // 현재 월 현금흐름 가져오기
+      const currentMonth = new Date().getMonth() + 1;
       let currentMonthCashFlow = 0;
       try {
-        const cashFlowData = await cashflowApi.getMonthlySummary(2025, 1);
-        currentMonthCashFlow = cashFlowData.totalEndingCash;
+        const cashFlowData = await cashflowApi.getMonthlySummary(currentYear, currentMonth);
+        currentMonthCashFlow = cashFlowData.totalEndingCash || 0;
       } catch (err) {
-        console.log('No cash flow data available');
+        console.log('No cash flow data available for current month');
       }
 
       setStats({
@@ -56,7 +63,6 @@ const Dashboard: React.FC = () => {
     <main className="flex-1 overflow-y-auto p-6 lg:p-8">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800">GRK Workspace</h1>
-          <p className="text-slate-500 mt-1">업무의 중심, 모든 데이터를 한 곳에서 관리하세요.</p>
         </header>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

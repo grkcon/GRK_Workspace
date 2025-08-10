@@ -1,59 +1,83 @@
-import React, { useState } from 'react';
-import { LeaveRequest, LeaveBalance, Employee } from '../types/attendance';
+import React, { useState, useEffect } from 'react';
+import { LeaveRequest as FrontendLeaveRequest, LeaveBalance as FrontendLeaveBalance, Employee } from '../types/attendance';
+import { LeaveRequest, LeaveBalance, attendanceApi, LeaveType, RequestStatus } from '../services/attendanceApi';
+import { employeeApi } from '../services/employeeApi';
 import LeaveRequestModal from '../components/LeaveRequestModal';
 import CancelRequestModal from '../components/CancelRequestModal';
 
 const AttendanceManagement: React.FC = () => {
-  const [leaveBalance] = useState<LeaveBalance>({
-    total: 15,
-    used: 3,
-    remaining: 12
+  const [leaveBalance, setLeaveBalance] = useState<FrontendLeaveBalance>({
+    total: 0,
+    used: 0,
+    remaining: 0
   });
+  const [leaveRequests, setLeaveRequests] = useState<FrontendLeaveRequest[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentEmployeeId] = useState(1); // 현재 로그인한 직원 ID (임시)
 
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([
-    {
-      id: 1,
-      type: '연차',
-      startDate: '2025-08-15',
-      endDate: '2025-08-15',
-      days: 1,
-      reason: '개인 사유',
-      status: '승인',
-      requestDate: '2025-08-01',
-      approver: '박영훈'
-    },
-    {
-      id: 2,
-      type: '오전 반차',
-      startDate: '2025-08-10',
-      endDate: '2025-08-10',
-      days: 0.5,
-      reason: '병원 진료',
-      status: '상신중',
-      requestDate: '2025-08-05'
-    },
-    {
-      id: 3,
-      type: '연차',
-      startDate: '2025-07-20',
-      endDate: '2025-07-22',
-      days: 3,
-      reason: '가족 여행',
-      status: '반려',
-      requestDate: '2025-07-15',
-      rejectReason: '업무 일정 충돌'
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // 직원 목록 가져오기
+      const employeesData = await employeeApi.getActive();
+      setEmployees(employeesData.map(emp => ({
+        id: emp.id,
+        name: emp.name,
+        department: emp.department,
+        position: emp.position
+      })));
+
+      // 현재 직원의 휴가 잔액 가져오기
+      try {
+        const balanceData = await attendanceApi.getLeaveBalance(currentEmployeeId);
+        setLeaveBalance({
+          total: typeof balanceData.total === 'string' ? parseFloat(balanceData.total) : balanceData.total,
+          used: typeof balanceData.used === 'string' ? parseFloat(balanceData.used) : balanceData.used,
+          remaining: typeof balanceData.remaining === 'string' ? parseFloat(balanceData.remaining) : balanceData.remaining
+        });
+      } catch (error) {
+        console.log('No leave balance data available');
+      }
+
+      // 현재 직원의 휴가 신청 내역 가져오기
+      try {
+        const requestsData = await attendanceApi.getLeaveRequestsByEmployee(currentEmployeeId);
+        setLeaveRequests(convertToFrontendRequests(requestsData));
+      } catch (error) {
+        console.log('No leave requests data available');
+      }
+    } catch (error) {
+      console.error('Failed to fetch attendance data:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
-  const [employees] = useState<Employee[]>([
-    { id: 1, name: '윤승현', department: '개발팀', position: '팀장' },
-    { id: 2, name: '박영훈', department: '개발팀', position: '선임' }
-  ]);
+  const convertToFrontendRequests = (backendRequests: LeaveRequest[]): FrontendLeaveRequest[] => {
+    return backendRequests.map(req => ({
+      id: req.id,
+      type: req.type as any,
+      startDate: new Date(req.startDate).toISOString().split('T')[0],
+      endDate: new Date(req.endDate).toISOString().split('T')[0],
+      days: typeof req.days === 'string' ? parseFloat(req.days) : req.days,
+      reason: req.reason,
+      status: req.status as any,
+      requestDate: new Date(req.requestDate).toISOString().split('T')[0],
+      approver: req.approver,
+      rejectReason: req.rejectReason
+    }));
+  };
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | undefined>();
-  const [editingRequest, setEditingRequest] = useState<LeaveRequest | undefined>();
+  const [selectedRequest, setSelectedRequest] = useState<FrontendLeaveRequest | undefined>();
+  const [editingRequest, setEditingRequest] = useState<FrontendLeaveRequest | undefined>();
 
   const getStatusStyle = (status: string) => {
     const styles = {
@@ -68,41 +92,55 @@ const AttendanceManagement: React.FC = () => {
     return new Date(dateString).toLocaleDateString('ko-KR');
   };
 
-  const handleNewRequest = (newRequest: Omit<LeaveRequest, 'id' | 'requestDate' | 'status'>) => {
-    if (editingRequest) {
-      // 수정 모드
-      const updatedRequests = leaveRequests.map(req =>
-        req.id === editingRequest.id
-          ? { ...req, ...newRequest }
-          : req
-      );
-      setLeaveRequests(updatedRequests);
-      setEditingRequest(undefined);
-    } else {
-      // 새 신청 모드
-      const request: LeaveRequest = {
-        ...newRequest,
-        id: Math.max(...leaveRequests.map(r => r.id)) + 1,
-        requestDate: new Date().toISOString().split('T')[0],
-        status: '상신중'
-      };
-      setLeaveRequests([...leaveRequests, request]);
+  const handleNewRequest = async (newRequest: Omit<FrontendLeaveRequest, 'id' | 'requestDate' | 'status'>) => {
+    try {
+      if (editingRequest) {
+        // 수정 모드
+        await attendanceApi.updateLeaveRequest(editingRequest.id, {
+          type: newRequest.type as LeaveType,
+          startDate: newRequest.startDate,
+          endDate: newRequest.endDate,
+          days: newRequest.days,
+          reason: newRequest.reason
+        });
+        setEditingRequest(undefined);
+      } else {
+        // 새 신청 모드
+        await attendanceApi.createLeaveRequest({
+          type: newRequest.type as LeaveType,
+          startDate: newRequest.startDate,
+          endDate: newRequest.endDate,
+          days: newRequest.days,
+          reason: newRequest.reason,
+          employeeId: currentEmployeeId
+        });
+      }
+      
+      // 데이터 새로고침
+      await fetchData();
+      setIsRequestModalOpen(false);
+    } catch (error) {
+      console.error('Failed to save leave request:', error);
     }
-    setIsRequestModalOpen(false);
   };
 
-  const handleCancelRequest = (requestId: number, reason: string) => {
-    setLeaveRequests(leaveRequests.filter(r => r.id !== requestId));
-    setIsCancelModalOpen(false);
-    setSelectedRequest(undefined);
+  const handleCancelRequest = async (requestId: number, reason: string) => {
+    try {
+      await attendanceApi.deleteLeaveRequest(requestId);
+      await fetchData(); // 데이터 새로고침
+      setIsCancelModalOpen(false);
+      setSelectedRequest(undefined);
+    } catch (error) {
+      console.error('Failed to cancel leave request:', error);
+    }
   };
 
-  const openCancelModal = (request: LeaveRequest) => {
+  const openCancelModal = (request: FrontendLeaveRequest) => {
     setSelectedRequest(request);
     setIsCancelModalOpen(true);
   };
 
-  const openEditModal = (request: LeaveRequest) => {
+  const openEditModal = (request: FrontendLeaveRequest) => {
     setEditingRequest(request);
     setIsRequestModalOpen(true);
   };
@@ -193,50 +231,64 @@ const AttendanceManagement: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="text-slate-700">
-                {leaveRequests.map((request) => (
-                  <tr
-                    key={request.id}
-                    className="border-t border-slate-200 hover:bg-slate-50"
-                  >
-                    <td className="px-6 py-4 font-medium">{request.type}</td>
-                    <td className="px-6 py-4">{formatDate(request.startDate)}</td>
-                    <td className="px-6 py-4">{formatDate(request.endDate)}</td>
-                    <td className="px-6 py-4 text-center">{request.days}일</td>
-                    <td className="px-6 py-4 max-w-xs truncate">{request.reason}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(request.status)}`}>
-                        {request.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">{formatDate(request.requestDate)}</td>
-                    <td className="px-6 py-4 text-center">
-                      {request.status === '상신중' && (
-                        <div className="space-x-2">
-                          <button 
-                            onClick={() => openEditModal(request)}
-                            className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                          >
-                            수정
-                          </button>
-                          <button 
-                            onClick={() => openCancelModal(request)}
-                            className="text-red-600 hover:text-red-900 text-sm font-medium"
-                          >
-                            취소
-                          </button>
-                        </div>
-                      )}
-                      {request.status === '반려' && request.rejectReason && (
-                        <span className="text-xs text-slate-500" title={request.rejectReason}>
-                          반려사유
-                        </span>
-                      )}
-                      {request.status === '승인' && (
-                        <span className="text-xs text-slate-500">-</span>
-                      )}
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
+                      로딩 중...
                     </td>
                   </tr>
-                ))}
+                ) : leaveRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
+                      휴가 신청 내역이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  leaveRequests.map((request) => (
+                    <tr
+                      key={request.id}
+                      className="border-t border-slate-200 hover:bg-slate-50"
+                    >
+                      <td className="px-6 py-4 font-medium">{request.type}</td>
+                      <td className="px-6 py-4">{formatDate(request.startDate)}</td>
+                      <td className="px-6 py-4">{formatDate(request.endDate)}</td>
+                      <td className="px-6 py-4 text-center">{request.days}일</td>
+                      <td className="px-6 py-4 max-w-xs truncate">{request.reason}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(request.status)}`}>
+                          {request.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">{formatDate(request.requestDate)}</td>
+                      <td className="px-6 py-4 text-center">
+                        {request.status === '상신중' && (
+                          <div className="space-x-2">
+                            <button 
+                              onClick={() => openEditModal(request)}
+                              className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                            >
+                              수정
+                            </button>
+                            <button 
+                              onClick={() => openCancelModal(request)}
+                              className="text-red-600 hover:text-red-900 text-sm font-medium"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        )}
+                        {request.status === '반려' && request.rejectReason && (
+                          <span className="text-xs text-slate-500" title={request.rejectReason}>
+                            반려사유
+                          </span>
+                        )}
+                        {request.status === '승인' && (
+                          <span className="text-xs text-slate-500">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

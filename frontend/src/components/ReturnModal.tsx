@@ -37,7 +37,7 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ isOpen, onClose, employee, on
       ></div>
       <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl relative z-50">
         <header className="p-4 border-b border-slate-200">
-          <h3 className="font-bold text-lg">복직 신청</h3>
+          <h3 className="font-bold text-lg">복직 등록</h3>
         </header>
         <div className="p-6 space-y-4 text-sm">
           <div className="grid grid-cols-2 gap-4">

@@ -53,7 +53,7 @@ export interface OpexItem {
 }
 
 export interface ProjectPPE {
-  projectId: number;
+  id: number;
   revenue: number;          // 매출액
   laborCost: number;        // 투입인건비
   outsourcingCost: number;  // 외주비용
@@ -64,12 +64,76 @@ export interface ProjectPPE {
   operationIncomeRate: number; // Operation Income %
   profit: number;           // Profit
   profitRate: number;       // Profit %
-  payment: ProjectPayment;
-  client: ProjectClient;
+  createdAt: string;
+  updatedAt: string;
+  project?: {
+    id: number;
+    name: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    contractAmount: number;
+    projectClient?: {
+      id: number;
+      companyName: string;
+      contactPerson: string;
+      contactNumber: string;
+      email: string;
+    };
+    projectPayment?: {
+      id: number;
+      downPayment: number;
+      middlePayment: number;
+      finalPayment: number;
+    };
+    internalStaff?: {
+      id: number;
+      name: string;
+      role: string;
+      startDate: string;
+      endDate: string;
+      utilization: number;
+      exclusionDays: number;
+      totalCost: number;
+    }[];
+    externalStaff?: {
+      id: number;
+      name: string;
+      role: string;
+      contact: string;
+      period: string;
+      cost: number;
+      memo: string;
+    }[];
+  };
+  payment?: ProjectPayment;
+  client?: ProjectClient;
   internalStaff?: InternalStaff[];
   externalStaff?: ExternalStaff[];
   indirectOpex?: OpexItem[];
   directOpex?: OpexItem[];
+}
+
+// 백엔드 API와 호환되는 타입들 추가
+export interface CreatePPEDto {
+  revenue: number;
+  laborCost: number;
+  outsourcingCost: number;
+  opexCost: number;
+}
+
+export interface UpdatePPEDto {
+  revenue?: number;
+  laborCost?: number;
+  outsourcingCost?: number;
+  opexCost?: number;
+}
+
+export interface PPESummary {
+  totalProjects: number;
+  totalRevenue: number;
+  totalProfit: number;
+  avgProfitRate: number;
 }
 
 export interface HRMaster {

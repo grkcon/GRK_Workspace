@@ -16,7 +16,6 @@ export class MonthlyOpex extends BaseEntity {
 
   @OneToMany(() => OpexItem, (opexItem) => opexItem.monthlyOpex, {
     cascade: true,
-    eager: true,
   })
   opexItems: OpexItem[];
 

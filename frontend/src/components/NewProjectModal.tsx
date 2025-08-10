@@ -165,12 +165,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onSa
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center">
+    <div className="fixed inset-0 z-30">
       <div 
-        className="absolute inset-0 bg-black bg-opacity-40"
+        className="absolute inset-0 bg-black bg-opacity-20"
         onClick={onClose}
       ></div>
-      <div className="w-full max-w-7xl bg-white rounded-xl shadow-2xl relative z-50 flex flex-col h-[90vh]">
+      <div className={`absolute top-0 right-0 h-full w-full max-w-5xl bg-white shadow-2xl flex flex-col transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <header className="p-4 border-b border-slate-200">
           <h3 className="font-bold text-lg">새 프로젝트 추가</h3>
         </header>

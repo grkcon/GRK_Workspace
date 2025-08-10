@@ -2,9 +2,20 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 class ApiClient {
   private baseURL: string;
+  private token: string | null = null;
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
+    this.token = localStorage.getItem('accessToken');
+  }
+
+  setToken(token: string | null) {
+    this.token = token;
+    if (token) {
+      localStorage.setItem('accessToken', token);
+    } else {
+      localStorage.removeItem('accessToken');
+    }
   }
 
   private async request<T>(
@@ -12,22 +23,48 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
+    console.log('API Base URL:', this.baseURL); // 베이스 URL 확인
+    console.log('Endpoint:', endpoint); // 엔드포인트 확인
+    console.log('Full URL:', url); // 전체 URL 확인
     
+    const headers: any = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     };
 
     const response = await fetch(url, config);
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Token expired or invalid
+        this.setToken(null);
+        window.location.href = '/login';
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return response.json();
+    // 응답 내용이 비어있는 경우 처리
+    const text = await response.text();
+    if (!text) {
+      return {} as T;
+    }
+    
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      // JSON 파싱 실패 시 빈 객체 반환
+      console.warn('Failed to parse JSON response:', text);
+      return {} as T;
+    }
   }
 
   async get<T>(endpoint: string): Promise<T> {
@@ -44,6 +81,13 @@ class ApiClient {
   async put<T>(endpoint: string, data: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async patch<T>(endpoint: string, data: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   }

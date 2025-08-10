@@ -12,8 +12,11 @@ export interface Employee {
   endDate?: Date;
   monthlySalary: number;
   status: 'ACTIVE' | 'INACTIVE' | 'ON_LEAVE' | 'RESIGNED';
+  profileImageUrl?: string;
   ssn?: string;
+  bankName?: string;
   bankAccount?: string;
+  consultantIntroduction?: string;
   education?: Education[];
   experience?: Experience[];
   leaveBalance?: LeaveBalance[];
@@ -28,7 +31,8 @@ export interface Education {
   degree: string;
   major: string;
   school: string;
-  graduationYear: number;
+  startDate?: Date;
+  graduationDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,10 +40,11 @@ export interface Education {
 export interface Experience {
   id: number;
   company: string;
+  department: string;
   position: string;
-  startDate: Date;
-  endDate: Date;
-  description: string;
+  startDate?: Date;
+  endDate?: Date;
+  annualSalary?: number;
   createdAt: Date;
   updatedAt: Date;
 }
