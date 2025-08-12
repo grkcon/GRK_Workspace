@@ -1,8 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import LoginWithCustomButton from './components/LoginWithCustomButton';
-import PrivateRoute from './components/PrivateRoute';
+// import { AuthProvider } from './contexts/AuthContext';
+// import LoginWithCustomButton from './components/LoginWithCustomButton';
+// import PrivateRoute from './components/PrivateRoute';
 import Dashboard from './pages/Dashboard';
 import EmployeeManagement from './pages/EmployeeManagement';
 import OpexManagement from './pages/OpexManagement';
@@ -19,17 +19,17 @@ import './App.css';
 
 function App() {
   // 환경변수가 제대로 로드되지 않을 경우를 위해 직접 설정
-  const GOOGLE_CLIENT_ID = '222197872071-je5sjk4cafkv5smf3be3jebo1cvsaf5g.apps.googleusercontent.com';
+  // const GOOGLE_CLIENT_ID = '222197872071-je5sjk4cafkv5smf3be3jebo1cvsaf5g.apps.googleusercontent.com';
 
   return (
-    <AuthProvider>
+    // <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={<LoginWithCustomButton clientId={GOOGLE_CLIENT_ID} />} />
+          {/* <Route path="/login" element={<LoginWithCustomButton clientId={GOOGLE_CLIENT_ID} />} /> */}
           <Route
             path="/*"
             element={
-              <PrivateRoute>
+              // <PrivateRoute>
                 <div className="App flex h-screen bg-slate-100">
                   <Sidebar />
                   <div className="flex-1">
@@ -49,12 +49,12 @@ function App() {
                     </Routes>
                   </div>
                 </div>
-              </PrivateRoute>
+              // </PrivateRoute>
             }
           />
         </Routes>
       </Router>
-    </AuthProvider>
+    // </AuthProvider>
   );
 }
 

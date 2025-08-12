@@ -1,21 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-interface Employee {
-  id: number;
-  emp_no: string;
-  name: string;
-  department: string;
-  position: string;
-  totalCR: number;
-}
-
-interface CRDetail {
-  employeeId: number;
-  projectName: string;
-  projectRevenue: number;
-  costWeight: number;
-  cr: number;
-}
+import { crApi, Employee, CRDetail } from '../services/crApi';
 
 interface CRDetailPanelProps {
   isOpen: boolean;
@@ -105,27 +89,48 @@ const CRDetailPanel: React.FC<CRDetailPanelProps> = ({ isOpen, employee, crDetai
 };
 
 const CRManagement: React.FC = () => {
-  const [employees] = useState<Employee[]>([]); // 빈 배열로 시작
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [crDetails] = useState<CRDetail[]>([]); // 빈 배열로 시작
+  const [crDetails, setCrDetails] = useState<CRDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadEmployeeCRList();
+  }, []);
+
+  const loadEmployeeCRList = async () => {
+    try {
+      setLoading(true);
+      const data = await crApi.getEmployeeCRList();
+      setEmployees(data);
+    } catch (error) {
+      console.error('CR 데이터 로딩 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatCurrency = (num: number) => {
     return new Intl.NumberFormat('ko-KR').format(Math.round(num));
   };
 
-  const openPanel = (employee: Employee) => {
-    setSelectedEmployee(employee);
-    setIsPanelOpen(true);
+  const openPanel = async (employee: Employee) => {
+    try {
+      setSelectedEmployee(employee);
+      setIsPanelOpen(true);
+      // 직원별 CR 상세 내역 로드
+      const details = await crApi.getEmployeeCRDetails(employee.id);
+      setCrDetails(details);
+    } catch (error) {
+      console.error('CR 상세 데이터 로딩 실패:', error);
+    }
   };
 
   const closePanel = () => {
     setSelectedEmployee(null);
     setIsPanelOpen(false);
-  };
-
-  const getEmployeeCRDetails = (employeeId: number): CRDetail[] => {
-    return crDetails.filter(detail => detail.employeeId === employeeId);
+    setCrDetails([]);
   };
 
   return (
@@ -151,7 +156,13 @@ const CRManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="text-slate-700">
-              {employees.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                    CR 데이터를 불러오는 중...
+                  </td>
+                </tr>
+              ) : employees.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
                     CR 데이터가 없습니다.
@@ -182,7 +193,7 @@ const CRManagement: React.FC = () => {
       <CRDetailPanel
         isOpen={isPanelOpen}
         employee={selectedEmployee}
-        crDetails={selectedEmployee ? getEmployeeCRDetails(selectedEmployee.id) : []}
+        crDetails={crDetails}
         onClose={closePanel}
       />
     </div>

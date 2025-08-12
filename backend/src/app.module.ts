@@ -36,6 +36,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ExchangeRateModule } from './modules/exchange-rate/exchange-rate.module';
 import { PPEModule } from './modules/ppe/ppe.module';
+import { CRModule } from './modules/cr/cr.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { PPEModule } from './modules/ppe/ppe.module';
     AttendanceModule,
     ExchangeRateModule,
     PPEModule,
+    CRModule,
   ],
   controllers: [AppController],
   providers: [AppService],

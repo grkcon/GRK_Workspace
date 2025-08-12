@@ -1,10 +1,15 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+// import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { user, logout, userRole, hasPageAccess } = useAuth();
+  // const { user, logout, userRole, hasPageAccess } = useAuth();
+  
+  // 임시로 하드코딩된 사용자 정보
+  const user = { name: 'Admin', email: 'admin@grk.com', profilePicture: null, role: 'ADMIN' };
+  const logout = () => {};
+  const userRole = 'DEVELOPER';
 
   // 권한별 메뉴 정의
   const getMenuItems = () => {
