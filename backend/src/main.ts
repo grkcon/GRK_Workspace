@@ -20,8 +20,10 @@ async function bootstrap() {
 
   // CORS 설정
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: ['https://grk-workspace.duckdns.org', 'http://localhost:3000'],
     credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Authorization',
   });
 
   // 글로벌 Exception Filter 설정

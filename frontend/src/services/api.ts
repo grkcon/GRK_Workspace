@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 class ApiClient {
   private baseURL: string;
@@ -23,9 +23,6 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    console.log('API Base URL:', this.baseURL); // 베이스 URL 확인
-    console.log('Endpoint:', endpoint); // 엔드포인트 확인
-    console.log('Full URL:', url); // 전체 URL 확인
     
     const headers: any = {
       'Content-Type': 'application/json',
