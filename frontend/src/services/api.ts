@@ -1,14 +1,35 @@
 // api.ts
-// 1) 키 통일: 둘 다 지원하되, BASE_URL 우선 → 없으면 /api
+
+// 1) 키 통일: 둘 다 지원, 없으면 /api
 const API_BASE_URL = (
   process.env.REACT_APP_API_BASE_URL ??
   process.env.REACT_APP_API_URL ??
   '/api'
-).replace(/\/+$/, ''); // 끝의 슬래시 제거
+).replace(/\/+$/, ''); // 끝 슬래시 제거
 
-class ApiClient {
+function joinPath(base: string, endpoint: string) {
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${base}${path}`;
+}
+
+function normalizeToArray<T>(body: any): T[] {
+  if (Array.isArray(body)) return body as T[];
+  if (Array.isArray(body?.data)) return body.data as T[];
+  if (Array.isArray(body?.items)) return body.items as T[];
+  if (Array.isArray(body?.results)) return body.results as T[];
+  return [];
+}
+
+async function parseJsonSafely(res: Response) {
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) return null;
+  try { return await res.json(); } catch { return null; }
+}
+
+export class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private defaultTimeoutMs = 15000; // 15s
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
@@ -21,74 +42,111 @@ class ApiClient {
     else localStorage.removeItem('accessToken');
   }
 
-  // 경로 안전 조인
   private buildUrl(endpoint: string) {
-    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    return `${this.baseURL}${path}`;
+    return joinPath(this.baseURL, endpoint);
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async _request(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = this.buildUrl(endpoint);
 
+    const hasBody = options.body !== undefined && options.body !== null;
+
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as any),
     };
+    // Body가 있을 때만 Content-Type 기본값 설정
+    if (hasBody && !('Content-Type' in headers)) {
+      headers['Content-Type'] = 'application/json';
+    }
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
 
-    const response = await fetch(url, { ...options, headers });
+    // 타임아웃(옵션)
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
+    const to = ac ? setTimeout(() => ac.abort(), this.defaultTimeoutMs) : undefined;
 
-    // 에러 응답 처리
-    if (!response.ok) {
-      if (response.status === 401) {
+    try {
+      // 3xx 수동 감지 (로그인 리다이렉트 핸들)
+      const res = await fetch(url, {
+        ...options,
+        headers,
+        signal: ac?.signal,
+        redirect: 'manual' as RequestRedirect,
+      });
+
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('Location') || '';
+        if (loc.includes('/login')) {
+          this.setToken(null);
+          window.location.href = '/login';
+          throw new Error('Redirected to login');
+        }
+      }
+
+      if (res.status === 401) {
         this.setToken(null);
         window.location.href = '/login';
+        throw new Error('Unauthorized');
       }
-      // 가능한 경우 상세 메시지 추출
-      try {
-        const err = await response.json();
-        if (Array.isArray(err?.message)) throw new Error(err.message.join(', '));
-        if (typeof err?.message === 'string') throw new Error(err.message);
-      } catch { }
-      throw new Error(`HTTP ${response.status} ${response.statusText}`);
-    }
 
-    // 본문 처리 (빈 응답/204 대비)
-    const ct = response.headers.get('content-type') || '';
-    if (!ct) {
-      // 예: 204 No Content
-      return {} as T;
-    }
+      if (!res.ok) {
+        const errJson = await parseJsonSafely(res);
+        if (errJson?.message) {
+          throw new Error(Array.isArray(errJson.message) ? errJson.message.join(', ') : errJson.message);
+        }
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
 
-    if (ct.includes('application/json')) {
-      const body: any = await response.json();
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('text/html')) {
+        // 대개 인증 실패로 로그인 HTML이 내려오는 경우
+        this.setToken(null);
+        window.location.href = '/login';
+        throw new Error('Unexpected HTML (probably login page)');
+      }
 
-      // 2) 배열을 기대하는 사용처 보호: 흔한 래퍼를 풀어 배열로 정규화
-      //    - 배열이면 그대로
-      //    - {data: []} | {items: []} | {results: []} 면 내부 배열 반환
-      if (Array.isArray(body)) return body as T;
-      if (Array.isArray(body?.data)) return body.data as T;
-      if (Array.isArray(body?.items)) return body.items as T;
-      if (Array.isArray(body?.results)) return body.results as T;
+      // JSON 우선
+      const json = await parseJsonSafely(res);
+      if (json !== null) return json;
 
-      return body as T; // 그 외는 객체 그대로
-    }
-
-    // 텍스트/기타
-    const text = await response.text();
-    try {
-      // 일부 서버가 JSON인데 헤더가 틀린 경우 방어
-      return JSON.parse(text) as T;
-    } catch {
-      return (text ? (text as any) : ({} as any)) as T;
+      // 비-JSON은 텍스트로
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return text || {}; }
+    } finally {
+      if (to) clearTimeout(to);
     }
   }
 
-  get<T>(endpoint: string) { return this.request<T>(endpoint, { method: 'GET' }); }
-  post<T>(endpoint: string, data: any) { return this.request<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }); }
-  put<T>(endpoint: string, data: any) { return this.request<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }); }
-  patch<T>(endpoint: string, data: any) { return this.request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(data) }); }
-  delete<T>(endpoint: string) { return this.request<T>(endpoint, { method: 'DELETE' }); }
+  // ✔ 객체(JSON) 그대로 받고 싶을 때
+  async getJSON<T>(endpoint: string): Promise<T> {
+    return this._request(endpoint, { method: 'GET' }) as Promise<T>;
+  }
+
+  // ✔ 리스트 화면: 항상 배열 보장
+  async getList<T>(endpoint: string): Promise<T[]> {
+    const body = await this._request(endpoint, { method: 'GET' });
+    return normalizeToArray<T>(body);
+  }
+
+  async get<T>(endpoint: string): Promise<T> {
+    // 기존 시그니처 유지 (객체/리스트 모두 가능)
+    return this._request(endpoint, { method: 'GET' }) as Promise<T>;
+  }
+
+  async post<T>(endpoint: string, data: any): Promise<T> {
+    return this._request(endpoint, { method: 'POST', body: JSON.stringify(data) }) as Promise<T>;
+  }
+
+  async put<T>(endpoint: string, data: any): Promise<T> {
+    return this._request(endpoint, { method: 'PUT', body: JSON.stringify(data) }) as Promise<T>;
+  }
+
+  async patch<T>(endpoint: string, data: any): Promise<T> {
+    return this._request(endpoint, { method: 'PATCH', body: JSON.stringify(data) }) as Promise<T>;
+  }
+
+  async delete<T>(endpoint: string): Promise<T> {
+    return this._request(endpoint, { method: 'DELETE' }) as Promise<T>;
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
