@@ -4,6 +4,8 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import * as path from 'path';
+
 import {
   User,
   Employee,
@@ -42,6 +44,7 @@ import { CRModule } from './modules/cr/cr.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [path.resolve(__dirname, '..', '.env'), '.env'],
     }),
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
