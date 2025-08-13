@@ -1,9 +1,7 @@
-// api.ts
-
-// 1) 키 통일: 둘 다 지원, 없으면 /api
+// 1) 환경변수 키 통일: 둘 다 지원, 없으면 /api
 const API_BASE_URL = (
-  process.env.REACT_APP_API_BASE_URL ??
-  process.env.REACT_APP_API_URL ??
+  (process.env as any).REACT_APP_API_BASE_URL ??
+  (process.env as any).REACT_APP_API_URL ??
   '/api'
 ).replace(/\/+$/, ''); // 끝 슬래시 제거
 
@@ -33,11 +31,12 @@ export class ApiClient {
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
-    this.token = localStorage.getItem('accessToken');
+    this.token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
   }
 
   setToken(token: string | null) {
     this.token = token;
+    if (typeof window === 'undefined') return;
     if (token) localStorage.setItem('accessToken', token);
     else localStorage.removeItem('accessToken');
   }
@@ -50,41 +49,39 @@ export class ApiClient {
     const url = this.buildUrl(endpoint);
 
     const hasBody = options.body !== undefined && options.body !== null;
-
     const headers: Record<string, string> = {
       ...(options.headers as any),
     };
-    // Body가 있을 때만 Content-Type 기본값 설정
+    // Body가 있을 때만 Content-Type 기본값
     if (hasBody && !('Content-Type' in headers)) {
       headers['Content-Type'] = 'application/json';
     }
+    // JSON 기대
+    if (!('Accept' in headers)) headers['Accept'] = 'application/json';
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
 
-    // 타임아웃(옵션)
+    // 타임아웃
     const ac = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
     const to = ac ? setTimeout(() => ac.abort(), this.defaultTimeoutMs) : undefined;
 
     try {
-      // 3xx 수동 감지 (로그인 리다이렉트 핸들)
+      // 리다이렉트 자동 추종 안 함(HTML 섞이는 것 방지)
       const res = await fetch(url, {
         ...options,
         headers,
-        signal: ac?.signal,
         redirect: 'manual' as RequestRedirect,
+        signal: ac?.signal,
       });
 
+      // 3xx: 이동하지 않고 에러로 처리 (로그인 페이지 비활성 상태)
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get('Location') || '';
-        if (loc.includes('/login')) {
-          this.setToken(null);
-          window.location.href = '/login';
-          throw new Error('Redirected to login');
-        }
+        throw new Error(`Redirected (${res.status}) ${loc}`);
       }
 
+      // 401: 토큰만 정리하고 에러
       if (res.status === 401) {
         this.setToken(null);
-        window.location.href = '/login';
         throw new Error('Unauthorized');
       }
 
@@ -98,17 +95,15 @@ export class ApiClient {
 
       const ct = res.headers.get('content-type') || '';
       if (ct.includes('text/html')) {
-        // 대개 인증 실패로 로그인 HTML이 내려오는 경우
-        this.setToken(null);
-        window.location.href = '/login';
-        throw new Error('Unexpected HTML (probably login page)');
+        // SPA/HTML이 떨어지는 상황은 비정상 → 에러
+        throw new Error('Unexpected HTML response');
       }
 
       // JSON 우선
       const json = await parseJsonSafely(res);
       if (json !== null) return json;
 
-      // 비-JSON은 텍스트로
+      // 비-JSON 응답
       const text = await res.text();
       try { return JSON.parse(text); } catch { return text || {}; }
     } finally {
@@ -127,8 +122,8 @@ export class ApiClient {
     return normalizeToArray<T>(body);
   }
 
+  // 기존 시그니처 유지(객체/리스트 모두 가능)
   async get<T>(endpoint: string): Promise<T> {
-    // 기존 시그니처 유지 (객체/리스트 모두 가능)
     return this._request(endpoint, { method: 'GET' }) as Promise<T>;
   }
 
