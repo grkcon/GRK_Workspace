@@ -148,34 +148,33 @@ const EmployeeManagement: React.FC = () => {
         const employeeData: any = {
           ...createData,
           // 숫자 필드들을 올바른 타입으로 변환
-          age: createData.age ? Number(createData.age) : undefined,
           monthlySalary: createData.monthlySalary && createData.monthlySalary.trim() !== '' ? Math.round(Number(createData.monthlySalary.toString().replace(/,/g, '')) / 12) : undefined,
           // 빈 날짜 문자열 처리
           endDate: createData.endDate && createData.endDate.trim() !== '' ? createData.endDate : undefined
         };
 
-        // 빈 배열이 아닌 경우에만 education 필드 추가
-        if (createData.education && createData.education.length > 0) {
-          employeeData.education = createData.education.map(edu => ({
-            school: edu.school,
-            major: edu.major,
-            degree: edu.degree,
-            startDate: edu.startDate && edu.startDate.trim() !== '' ? edu.startDate : undefined,
-            graduationDate: edu.graduationDate && edu.graduationDate.trim() !== '' ? edu.graduationDate : undefined
-          }));
-        }
+        // 학력 정보 처리 (빈 배열도 전송)
+        employeeData.education = createData.education && createData.education.length > 0 
+          ? createData.education.map(edu => ({
+              school: edu.school,
+              major: edu.major,
+              degree: edu.degree,
+              startDate: edu.startDate && edu.startDate.trim() !== '' ? edu.startDate : undefined,
+              graduationDate: edu.graduationDate && edu.graduationDate.trim() !== '' ? edu.graduationDate : undefined
+            }))
+          : [];
 
-        // 빈 배열이 아닌 경우에만 experience 필드 추가
-        if (createData.experience && createData.experience.length > 0) {
-          employeeData.experience = createData.experience.map(exp => ({
-            company: exp.company,
-            department: exp.department,
-            position: exp.position,
-            startDate: exp.startDate && exp.startDate.trim() !== '' ? exp.startDate : undefined,
-            endDate: exp.endDate && exp.endDate.trim() !== '' ? exp.endDate : undefined,
-            annualSalary: exp.annualSalary && exp.annualSalary.trim() !== '' ? Number(exp.annualSalary.toString().replace(/,/g, '')) : undefined
-          }));
-        }
+        // 경력 정보 처리 (빈 배열도 전송)
+        employeeData.experience = createData.experience && createData.experience.length > 0
+          ? createData.experience.map(exp => ({
+              company: exp.company,
+              department: exp.department,
+              position: exp.position,
+              startDate: exp.startDate && exp.startDate.trim() !== '' ? exp.startDate : undefined,
+              endDate: exp.endDate && exp.endDate.trim() !== '' ? exp.endDate : undefined,
+              annualSalary: exp.annualSalary && exp.annualSalary.trim() !== '' ? Number(exp.annualSalary.toString().replace(/,/g, '')) : undefined
+            }))
+          : [];
         
         console.log('Creating new employee...');
         console.log('Original form data:', formData);
@@ -194,34 +193,33 @@ const EmployeeManagement: React.FC = () => {
           ...formData,
           status: selectedEmployee.status, // 기존 상태 유지
           // 숫자 필드들을 올바른 타입으로 변환
-          age: formData.age ? Number(formData.age) : undefined,
           monthlySalary: formData.monthlySalary && formData.monthlySalary.trim() !== '' ? Math.round(Number(formData.monthlySalary.toString().replace(/,/g, '')) / 12) : undefined,
           // 빈 날짜 문자열 처리
           endDate: formData.endDate && formData.endDate.trim() !== '' ? formData.endDate : undefined
         };
 
-        // 빈 배열이 아닌 경우에만 education 필드 추가
-        if (formData.education && formData.education.length > 0) {
-          updateData.education = formData.education.map(edu => ({
-            school: edu.school,
-            major: edu.major,
-            degree: edu.degree,
-            startDate: edu.startDate && edu.startDate.trim() !== '' ? edu.startDate : undefined,
-            graduationDate: edu.graduationDate && edu.graduationDate.trim() !== '' ? edu.graduationDate : undefined
-          }));
-        }
+        // 학력 정보 처리 (빈 배열도 전송)
+        updateData.education = formData.education && formData.education.length > 0
+          ? formData.education.map(edu => ({
+              school: edu.school,
+              major: edu.major,
+              degree: edu.degree,
+              startDate: edu.startDate && edu.startDate.trim() !== '' ? edu.startDate : undefined,
+              graduationDate: edu.graduationDate && edu.graduationDate.trim() !== '' ? edu.graduationDate : undefined
+            }))
+          : [];
 
-        // 빈 배열이 아닌 경우에만 experience 필드 추가
-        if (formData.experience && formData.experience.length > 0) {
-          updateData.experience = formData.experience.map(exp => ({
-            company: exp.company,
-            department: exp.department,
-            position: exp.position,
-            startDate: exp.startDate && exp.startDate.trim() !== '' ? exp.startDate : undefined,
-            endDate: exp.endDate && exp.endDate.trim() !== '' ? exp.endDate : undefined,
-            annualSalary: exp.annualSalary && exp.annualSalary.trim() !== '' ? Number(exp.annualSalary.toString().replace(/,/g, '')) : undefined
-          }));
-        }
+        // 경력 정보 처리 (빈 배열도 전송)
+        updateData.experience = formData.experience && formData.experience.length > 0
+          ? formData.experience.map(exp => ({
+              company: exp.company,
+              department: exp.department,
+              position: exp.position,
+              startDate: exp.startDate && exp.startDate.trim() !== '' ? exp.startDate : undefined,
+              endDate: exp.endDate && exp.endDate.trim() !== '' ? exp.endDate : undefined,
+              annualSalary: exp.annualSalary && exp.annualSalary.trim() !== '' ? Number(exp.annualSalary.toString().replace(/,/g, '')) : undefined
+            }))
+          : [];
         
         await employeeApi.update(selectedEmployee.id, updateData);
         console.log('Employee updated successfully');
@@ -231,20 +229,49 @@ const EmployeeManagement: React.FC = () => {
     } catch (err) {
       console.error('Failed to save employee:', err);
       console.error('Error details:', err);
-      setError(`직원 정보 저장에 실패했습니다: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
+      
+      // 에러 메시지 분석 및 사용자 친화적 메시지 생성
+      let errorMessage = '직원 정보 저장에 실패했습니다.';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('column employee.education does not exist')) {
+          errorMessage = '데이터베이스 스키마 오류: education 컬럼이 존재하지 않습니다. 개발자에게 문의하세요.';
+        } else if (err.message.includes('column employee.experience does not exist')) {
+          errorMessage = '데이터베이스 스키마 오류: experience 컬럼이 존재하지 않습니다. 개발자에게 문의하세요.';
+        } else if (err.message.includes('property age should not exist')) {
+          errorMessage = '데이터 오류: 나이 필드가 포함되어 있습니다. 페이지를 새로고침 후 다시 시도하세요.';
+        } else if (err.message.includes('Bad Request')) {
+          errorMessage = `입력 데이터 오류: ${err.message}`;
+        } else {
+          errorMessage = `오류: ${err.message}`;
+        }
+      }
+      
+      setError(errorMessage);
+      
+      // 브라우저 알림도 표시
+      alert(errorMessage);
     }
   };
 
   const handleLeaveRequest = async (data: LeaveRequestData) => {
     try {
       if (selectedEmployee) {
-        await employeeApi.update(selectedEmployee.id, { status: 'ON_LEAVE' });
+        // 새로운 휴직 신청 API 호출
+        await employeeApi.processLeaveRequest(selectedEmployee.id, {
+          startDate: data.startDate,
+          returnDate: data.returnDate,
+          reason: data.reason,
+          payType: data.payType,
+          memo: data.memo
+        });
         console.log('휴직 신청 완료:', selectedEmployee.name);
         await fetchEmployees();
+        alert('휴직 신청이 성공적으로 처리되었습니다.');
       }
     } catch (err) {
-      console.error('Failed to update employee status:', err);
-      setError('휴직 신청에 실패했습니다.');
+      console.error('Failed to process leave request:', err);
+      alert('휴직 신청에 실패했습니다.');
     }
     setIsLeaveModalOpen(false);
     closePanel();
@@ -253,13 +280,15 @@ const EmployeeManagement: React.FC = () => {
   const handleReturnRequest = async (data: ReturnRequestData) => {
     try {
       if (selectedEmployee) {
-        await employeeApi.update(selectedEmployee.id, { status: 'ACTIVE' });
+        // 새로운 복직 처리 API 호출
+        await employeeApi.processReturnFromLeave(selectedEmployee.id);
         console.log('복직 신청 완료:', selectedEmployee.name);
         await fetchEmployees();
+        alert('복직이 성공적으로 처리되었습니다.');
       }
     } catch (err) {
-      console.error('Failed to update employee status:', err);
-      setError('복직 신청에 실패했습니다.');
+      console.error('Failed to process return request:', err);
+      alert('복직 처리에 실패했습니다.');
     }
     setIsReturnModalOpen(false);
     closePanel();
@@ -268,16 +297,24 @@ const EmployeeManagement: React.FC = () => {
   const handleResignationRequest = async (data: ResignationRequestData) => {
     try {
       if (selectedEmployee) {
-        await employeeApi.update(selectedEmployee.id, { 
-          status: 'RESIGNED',
-          endDate: data.endDate 
+        // 새로운 퇴사 신청 API 호출
+        await employeeApi.processResignationRequest(selectedEmployee.id, {
+          resignDate: data.resignDate,
+          reason: data.reason,
+          leaveAccrued: data.leaveAccrued,
+          leaveUsed: data.leaveUsed,
+          leaveRemaining: data.leaveRemaining,
+          leaveAllowance: data.leaveAllowance,
+          severancePay: data.severancePay,
+          memo: data.memo
         });
         console.log('퇴사 신청 완료:', selectedEmployee.name);
         await fetchEmployees();
+        alert('퇴사 신청이 성공적으로 처리되었습니다.');
       }
     } catch (err) {
-      console.error('Failed to update employee status:', err);
-      setError('퇴사 신청에 실패했습니다.');
+      console.error('Failed to process resignation request:', err);
+      alert('퇴사 신청에 실패했습니다.');
     }
     setIsResignationModalOpen(false);
     closePanel();
@@ -432,12 +469,6 @@ const EmployeeManagement: React.FC = () => {
             )}
           </div>
         </header>
-        
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800">{error}</p>
-          </div>
-        )}
         
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           {loading ? (

@@ -27,8 +27,8 @@ export class Employee extends BaseEntity {
   @Column({ type: 'varchar', length: 100 })
   position: string; // 직급
 
-  @Column({ type: 'varchar', length: 100 })
-  rank: string; // 직책
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  rank?: string; // 직책
 
   @Column({ type: 'varchar', length: 100 })
   department: string; // 부서
@@ -36,8 +36,6 @@ export class Employee extends BaseEntity {
   @Column({ type: 'varchar', length: 20 })
   tel: string; // 전화번호
 
-  @Column({ type: 'int', nullable: true })
-  age?: number; // 나이
 
   @Column({ type: 'decimal', precision: 15, scale: 0, nullable: true })
   monthlySalary?: number; // 월급
@@ -73,17 +71,28 @@ export class Employee extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   consultantIntroduction?: string; // 컨설턴트 소개 (500자)
 
-  @OneToMany(() => Education, (education) => education.employee, {
-    cascade: true,
-    eager: true,
-  })
-  education: Education[];
+  @Column({ type: 'json', nullable: true })
+  education?: any[] | null; // 학력 정보 JSON 배열
 
-  @OneToMany(() => Experience, (experience) => experience.employee, {
-    cascade: true,
-    eager: true,
-  })
-  experience: Experience[];
+  @Column({ type: 'json', nullable: true })
+  experience?: any[] | null; // 경력 정보 JSON 배열
+
+  @Column({ type: 'json', nullable: true })
+  evaluation?: {
+    industryInsight: number;
+    consultingSkill: number;
+    jobAttitude: number;
+    clientRelationship: number;
+    peopleManagementSkill: number;
+    companyFitCommitment: number;
+    ceoEval?: number;
+    totalScore: number;
+    evaluatedAt: Date;
+    evaluatedBy?: string;
+    feedback?: {
+      [category: string]: string;
+    };
+  } | null; // 평가 정보
 
   @OneToMany(() => LeaveRequest, (leaveRequest) => leaveRequest.employee)
   leaveRequests: LeaveRequest[];

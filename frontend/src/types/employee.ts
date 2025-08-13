@@ -7,7 +7,6 @@ export interface Employee {
   rank: string;
   department: string;
   tel: string;
-  age: number;
   joinDate: Date;
   endDate?: Date;
   monthlySalary: number;
@@ -17,8 +16,8 @@ export interface Employee {
   bankName?: string;
   bankAccount?: string;
   consultantIntroduction?: string;
-  education?: Education[];
-  experience?: Experience[];
+  education?: any[] | null;
+  experience?: any[] | null;
   leaveBalance?: LeaveBalance[];
   hrUnitCost?: HRUnitCost;
   hrCosts?: EmployeeHRCost[];

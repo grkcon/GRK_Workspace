@@ -8,7 +8,7 @@ import {
   LeaveBalance,
   EmployeeStatus,
 } from '../../../entities';
-import { CreateEmployeeDto, UpdateEmployeeDto } from '../dto';
+import { CreateEmployeeDto, UpdateEmployeeDto, CreateLeaveRequestDto, CreateResignationRequestDto, CreateEvaluationDto } from '../dto';
 
 @Injectable()
 export class EmployeeService {
@@ -25,8 +25,18 @@ export class EmployeeService {
 
   async create(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
     // 사번 자동 생성 (제공되지 않은 경우)
-    const empNo = createEmployeeDto.empNo || (await this.generateEmpNo());
-    console.log(`Creating employee with empNo: ${empNo}`);
+    let empNo = createEmployeeDto.empNo;
+    if (!empNo) {
+      empNo = await this.generateEmpNo();
+      // 중복 체크 (안전장치)
+      const existingEmployee = await this.employeeRepository.findOne({
+        where: { empNo },
+        withDeleted: true,
+      });
+      if (existingEmployee) {
+        throw new Error(`사번 ${empNo}이 이미 존재합니다.`);
+      }
+    }
 
     const employee = this.employeeRepository.create({
       ...createEmployeeDto,
@@ -39,18 +49,14 @@ export class EmployeeService {
         : undefined,
     });
 
-    // 학력 정보 처리
-    if (createEmployeeDto.education) {
-      employee.education = createEmployeeDto.education.map((edu) =>
-        this.educationRepository.create(edu),
-      );
+    // 학력 정보 처리 (JSON으로 저장, 빈 배열도 허용)
+    if (createEmployeeDto.education !== undefined) {
+      employee.education = createEmployeeDto.education.length > 0 ? createEmployeeDto.education : null;
     }
 
-    // 경력 정보 처리
-    if (createEmployeeDto.experience) {
-      employee.experience = createEmployeeDto.experience.map((exp) =>
-        this.experienceRepository.create(exp),
-      );
+    // 경력 정보 처리 (JSON으로 저장, 빈 배열도 허용)
+    if (createEmployeeDto.experience !== undefined) {
+      employee.experience = createEmployeeDto.experience.length > 0 ? createEmployeeDto.experience : null;
     }
 
     const savedEmployee = await this.employeeRepository.save(employee);
@@ -70,14 +76,14 @@ export class EmployeeService {
 
   async findAll(): Promise<Employee[]> {
     return this.employeeRepository.find({
-      relations: ['education', 'experience', 'leaveBalance'],
+      relations: ['leaveBalance'],
     });
   }
 
   async findOne(id: number): Promise<Employee> {
     const employee = await this.employeeRepository.findOne({
       where: { id },
-      relations: ['education', 'experience', 'leaveBalance', 'leaveRequests'],
+      relations: ['leaveBalance', 'leaveRequests'],
     });
 
     if (!employee) {
@@ -90,7 +96,7 @@ export class EmployeeService {
   async findByEmpNo(empNo: string): Promise<Employee> {
     const employee = await this.employeeRepository.findOne({
       where: { empNo },
-      relations: ['education', 'experience', 'leaveBalance'],
+      relations: ['leaveBalance'],
     });
 
     if (!employee) {
@@ -106,8 +112,6 @@ export class EmployeeService {
   ): Promise<Employee> {
     const employee = await this.findOne(id);
 
-    console.log('Updating employee:', id, updateEmployeeDto);
-
     // 기본 정보 업데이트
     Object.assign(employee, {
       ...updateEmployeeDto,
@@ -120,27 +124,21 @@ export class EmployeeService {
         : employee.endDate,
     });
 
-    // 먼저 기본 정보만 저장
+    // 학력 정보 업데이트 (JSON으로 저장)
+    if (updateEmployeeDto.education !== undefined) {
+      employee.education = updateEmployeeDto.education && updateEmployeeDto.education.length > 0 
+        ? updateEmployeeDto.education 
+        : null;
+    }
+
+    // 경력 정보 업데이트 (JSON으로 저장)
+    if (updateEmployeeDto.experience !== undefined) {
+      employee.experience = updateEmployeeDto.experience && updateEmployeeDto.experience.length > 0 
+        ? updateEmployeeDto.experience 
+        : null;
+    }
+
     const savedEmployee = await this.employeeRepository.save(employee);
-
-    // 학력 정보 업데이트 (별도 처리)
-    if (updateEmployeeDto.education) {
-      await this.educationRepository.delete({ employee: { id } });
-      const educationEntities = updateEmployeeDto.education.map((edu) =>
-        this.educationRepository.create({ ...edu, employee: savedEmployee }),
-      );
-      await this.educationRepository.save(educationEntities);
-    }
-
-    // 경력 정보 업데이트 (별도 처리)
-    if (updateEmployeeDto.experience) {
-      await this.experienceRepository.delete({ employee: { id } });
-      const experienceEntities = updateEmployeeDto.experience.map((exp) =>
-        this.experienceRepository.create({ ...exp, employee: savedEmployee }),
-      );
-      await this.experienceRepository.save(experienceEntities);
-    }
-
     return this.findOne(savedEmployee.id);
   }
 
@@ -164,7 +162,7 @@ export class EmployeeService {
     return this.employeeRepository
       .find({
         where: {},
-        relations: ['education', 'experience', 'leaveBalance'],
+        relations: ['leaveBalance'],
         withDeleted: true,
       })
       .then((employees) => employees.filter((emp) => emp.deletedAt != null));
@@ -175,7 +173,7 @@ export class EmployeeService {
    */
   async findAllWithDeleted(): Promise<Employee[]> {
     return this.employeeRepository.find({
-      relations: ['education', 'experience', 'leaveBalance'],
+      relations: ['leaveBalance'],
       withDeleted: true,
     });
   }
@@ -190,7 +188,6 @@ export class EmployeeService {
   async getEmployeesByDepartment(department: string): Promise<Employee[]> {
     return this.employeeRepository.find({
       where: { department },
-      relations: ['education', 'experience'],
     });
   }
 
@@ -201,10 +198,11 @@ export class EmployeeService {
   private async generateEmpNo(): Promise<string> {
     const year = new Date().getFullYear();
 
-    // 해당 연도의 마지막 사번 조회
+    // 해당 연도의 마지막 사번 조회 (삭제된 직원 포함)
     const lastEmployee = await this.employeeRepository
       .createQueryBuilder('employee')
       .where('employee.empNo LIKE :pattern', { pattern: `${year}%` })
+      .withDeleted()
       .orderBy('employee.empNo', 'DESC')
       .getOne();
 
@@ -245,10 +243,6 @@ export class EmployeeService {
     const startOfMonth = new Date(year, month - 1, 1); // month는 1-12, Date는 0-11이므로 -1
     const endOfMonth = new Date(year, month, 0); // 다음 달 0일 = 현재 달 마지막 일
 
-    console.log(
-      `[DEBUG] 직원수 계산: ${year}년 ${month}월 (${startOfMonth.toISOString().split('T')[0]} ~ ${endOfMonth.toISOString().split('T')[0]})`,
-    );
-
     // 모든 직원 조회 (삭제되지 않은 직원만)
     const allEmployees = await this.employeeRepository.find({
       relations: ['leaveRequests'],
@@ -260,9 +254,6 @@ export class EmployeeService {
       // 1. 입사일이 해당 월 이후인 경우 제외
       const joinDate = new Date(employee.joinDate);
       if (joinDate > endOfMonth) {
-        console.log(
-          `[DEBUG] 입사일 이후: ${employee.name} (입사일: ${joinDate.toISOString().split('T')[0]})`,
-        );
         continue;
       }
 
@@ -270,16 +261,12 @@ export class EmployeeService {
       if (employee.endDate) {
         const endDate = new Date(employee.endDate);
         if (endDate < startOfMonth) {
-          console.log(
-            `[DEBUG] 퇴사일 이전: ${employee.name} (퇴사일: ${endDate.toISOString().split('T')[0]})`,
-          );
           continue;
         }
       }
 
       // 3. 상태가 RESIGNED인 경우 제외 (퇴사일이 없어도)
       if (employee.status === EmployeeStatus.RESIGNED) {
-        console.log(`[DEBUG] 퇴사 상태: ${employee.name}`);
         continue;
       }
 
@@ -298,7 +285,6 @@ export class EmployeeService {
       );
 
       if (isOnLeaveForEntireMonth) {
-        console.log(`[DEBUG] 휴직 중: ${employee.name}`);
         continue;
       }
 
@@ -316,19 +302,95 @@ export class EmployeeService {
         });
 
         if (hasLeaveInMonth) {
-          console.log(`[DEBUG] 휴직 상태 및 해당 월 휴가: ${employee.name}`);
           continue;
         }
       }
 
       // 모든 조건을 통과한 직원은 재직 중으로 카운트
       activeCount++;
-      console.log(
-        `[DEBUG] 재직 중: ${employee.name} (상태: ${employee.status})`,
-      );
     }
 
-    console.log(`[DEBUG] ${year}년 ${month}월 재직 직원수: ${activeCount}명`);
     return activeCount;
+  }
+
+  /**
+   * 휴직 신청 처리
+   */
+  async processLeaveRequest(leaveRequestDto: CreateLeaveRequestDto): Promise<Employee> {
+    const employee = await this.findOne(leaveRequestDto.employeeId);
+    
+    // 직원 상태를 휴직으로 변경
+    employee.status = EmployeeStatus.ON_LEAVE;
+    
+    return this.employeeRepository.save(employee);
+  }
+
+  /**
+   * 퇴사 신청 처리
+   */
+  async processResignationRequest(resignationRequestDto: CreateResignationRequestDto): Promise<Employee> {
+    const employee = await this.findOne(resignationRequestDto.employeeId);
+    
+    // 직원 상태를 퇴사로 변경하고 퇴사일 설정
+    employee.status = EmployeeStatus.RESIGNED;
+    employee.endDate = new Date(resignationRequestDto.resignDate);
+    
+    return this.employeeRepository.save(employee);
+  }
+
+  /**
+   * 복직 처리
+   */
+  async processReturnFromLeave(employeeId: number): Promise<Employee> {
+    const employee = await this.findOne(employeeId);
+    
+    if (employee.status !== EmployeeStatus.ON_LEAVE) {
+      throw new Error('휴직 상태가 아닌 직원은 복직할 수 없습니다.');
+    }
+    
+    employee.status = EmployeeStatus.ACTIVE;
+    
+    return this.employeeRepository.save(employee);
+  }
+
+  /**
+   * 직원 평가 저장
+   */
+  async saveEvaluation(employeeId: number, evaluationDto: CreateEvaluationDto): Promise<Employee> {
+    const employee = await this.findOne(employeeId);
+    
+    // 총점 계산
+    const totalScore = 
+      evaluationDto.industryInsight +
+      evaluationDto.consultingSkill +
+      evaluationDto.jobAttitude +
+      evaluationDto.clientRelationship +
+      evaluationDto.peopleManagementSkill +
+      evaluationDto.companyFitCommitment;
+    
+    // 평가 데이터 구성
+    employee.evaluation = {
+      industryInsight: evaluationDto.industryInsight,
+      consultingSkill: evaluationDto.consultingSkill,
+      jobAttitude: evaluationDto.jobAttitude,
+      clientRelationship: evaluationDto.clientRelationship,
+      peopleManagementSkill: evaluationDto.peopleManagementSkill,
+      companyFitCommitment: evaluationDto.companyFitCommitment,
+      ceoEval: evaluationDto.ceoEval || 0,
+      totalScore: totalScore,
+      evaluatedAt: new Date(),
+      evaluatedBy: evaluationDto.evaluatedBy || 'Admin',
+      feedback: evaluationDto.feedback || {}
+    };
+    
+    return this.employeeRepository.save(employee);
+  }
+
+  /**
+   * 직원 평가 조회
+   */
+  async getEvaluation(employeeId: number): Promise<any> {
+    const employee = await this.findOne(employeeId);
+    return employee.evaluation;
   }
 }

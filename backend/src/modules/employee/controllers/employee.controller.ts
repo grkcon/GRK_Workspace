@@ -35,6 +35,9 @@ import {
   UpdateDocumentDto,
   CreateEmployeeHRCostDto,
   UpdateEmployeeHRCostDto,
+  CreateLeaveRequestDto,
+  CreateResignationRequestDto,
+  CreateEvaluationDto,
 } from '../dto';
 import { Response } from 'express';
 
@@ -52,46 +55,10 @@ export class EmployeeController {
   @ApiResponse({ status: 201, description: 'Employee created successfully.' })
   @ApiResponse({ status: 400, description: 'Bad request.' })
   async create(@Body() createEmployeeDto: CreateEmployeeDto) {
-    console.log('=== Employee Creation Request ===');
-    console.log('Request Body:', JSON.stringify(createEmployeeDto, null, 2));
-    console.log('Request Body Type:', typeof createEmployeeDto);
-    console.log('Data types:');
-    console.log(
-      '- name:',
-      typeof createEmployeeDto.name,
-      createEmployeeDto.name,
-    );
-    console.log('- age:', typeof createEmployeeDto.age, createEmployeeDto.age);
-    console.log(
-      '- monthlySalary:',
-      typeof createEmployeeDto.monthlySalary,
-      createEmployeeDto.monthlySalary,
-    );
-    console.log(
-      '- joinDate:',
-      typeof createEmployeeDto.joinDate,
-      createEmployeeDto.joinDate,
-    );
-    console.log(
-      '- education:',
-      typeof createEmployeeDto.education,
-      createEmployeeDto.education,
-    );
-    console.log(
-      '- experience:',
-      typeof createEmployeeDto.experience,
-      createEmployeeDto.experience,
-    );
-    console.log('=====================================');
-
     try {
       const result = await this.employeeService.create(createEmployeeDto);
-      console.log('Employee created successfully:', result.id);
       return result;
     } catch (error) {
-      console.error('Employee creation failed:', error);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
       throw error;
     }
   }
@@ -145,47 +112,10 @@ export class EmployeeController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateEmployeeDto: UpdateEmployeeDto,
   ) {
-    console.log('=== Employee Update Request ===');
-    console.log('Employee ID:', id);
-    console.log('Request Body:', JSON.stringify(updateEmployeeDto, null, 2));
-    console.log('Request Body Type:', typeof updateEmployeeDto);
-    console.log('Data types:');
-    console.log(
-      '- name:',
-      typeof updateEmployeeDto.name,
-      updateEmployeeDto.name,
-    );
-    console.log('- age:', typeof updateEmployeeDto.age, updateEmployeeDto.age);
-    console.log(
-      '- monthlySalary:',
-      typeof updateEmployeeDto.monthlySalary,
-      updateEmployeeDto.monthlySalary,
-    );
-    console.log(
-      '- joinDate:',
-      typeof updateEmployeeDto.joinDate,
-      updateEmployeeDto.joinDate,
-    );
-    console.log(
-      '- education:',
-      typeof updateEmployeeDto.education,
-      updateEmployeeDto.education,
-    );
-    console.log(
-      '- experience:',
-      typeof updateEmployeeDto.experience,
-      updateEmployeeDto.experience,
-    );
-    console.log('=====================================');
-
     try {
       const result = await this.employeeService.update(id, updateEmployeeDto);
-      console.log('Employee updated successfully:', result.id);
       return result;
     } catch (error) {
-      console.error('Employee update failed:', error);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
       throw error;
     }
   }
@@ -558,5 +488,71 @@ export class EmployeeController {
     @Param('id', ParseIntPipe) employeeId: number,
   ) {
     return await this.hrCostService.findAllByEmployee(employeeId);
+  }
+
+  // ======== 휴직/퇴사 관련 엔드포인트 ========
+
+  @Post(':id/leave-request')
+  @ApiOperation({ summary: 'Process employee leave request' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({ status: 200, description: 'Leave request processed successfully' })
+  @ApiResponse({ status: 404, description: 'Employee not found' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async processLeaveRequest(
+    @Param('id', ParseIntPipe) employeeId: number,
+    @Body() leaveRequestDto: CreateLeaveRequestDto,
+  ) {
+    // DTO에 employeeId 설정
+    leaveRequestDto.employeeId = employeeId;
+    return await this.employeeService.processLeaveRequest(leaveRequestDto);
+  }
+
+  @Post(':id/resignation-request')
+  @ApiOperation({ summary: 'Process employee resignation request' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({ status: 200, description: 'Resignation request processed successfully' })
+  @ApiResponse({ status: 404, description: 'Employee not found' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async processResignationRequest(
+    @Param('id', ParseIntPipe) employeeId: number,
+    @Body() resignationRequestDto: CreateResignationRequestDto,
+  ) {
+    // DTO에 employeeId 설정
+    resignationRequestDto.employeeId = employeeId;
+    return await this.employeeService.processResignationRequest(resignationRequestDto);
+  }
+
+  @Post(':id/return-from-leave')
+  @ApiOperation({ summary: 'Process employee return from leave' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({ status: 200, description: 'Return from leave processed successfully' })
+  @ApiResponse({ status: 404, description: 'Employee not found' })
+  @ApiResponse({ status: 400, description: 'Employee is not on leave' })
+  async processReturnFromLeave(@Param('id', ParseIntPipe) employeeId: number) {
+    return await this.employeeService.processReturnFromLeave(employeeId);
+  }
+
+  // ======== 평가 관련 엔드포인트 ========
+
+  @Post(':id/evaluation')
+  @ApiOperation({ summary: 'Save employee evaluation' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({ status: 201, description: 'Evaluation saved successfully' })
+  @ApiResponse({ status: 404, description: 'Employee not found' })
+  @ApiResponse({ status: 400, description: 'Invalid evaluation data' })
+  async saveEvaluation(
+    @Param('id', ParseIntPipe) employeeId: number,
+    @Body() evaluationDto: CreateEvaluationDto,
+  ) {
+    return await this.employeeService.saveEvaluation(employeeId, evaluationDto);
+  }
+
+  @Get(':id/evaluation')
+  @ApiOperation({ summary: 'Get employee evaluation' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({ status: 200, description: 'Employee evaluation data' })
+  @ApiResponse({ status: 404, description: 'Employee not found' })
+  async getEvaluation(@Param('id', ParseIntPipe) employeeId: number) {
+    return await this.employeeService.getEvaluation(employeeId);
   }
 }

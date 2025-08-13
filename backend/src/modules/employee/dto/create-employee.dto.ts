@@ -14,33 +14,87 @@ import {
   IsNotEmpty,
   ArrayMaxSize,
   IsPositive,
+  ValidateBy,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EmployeeStatus } from '../../../entities';
 
+// 한국 주민등록번호 유효성 검증 함수
+function validateKoreanSSN(ssn: string): boolean {
+  if (!ssn || typeof ssn !== 'string') return false;
+  
+  // 형식 체크: 6자리-7자리
+  const ssnRegex = /^(\d{6})-(\d{7})$/;
+  const match = ssn.match(ssnRegex);
+  if (!match) return false;
+  
+  const [, front, back] = match;
+  
+  // 생년월일 유효성 검사
+  const year = parseInt(front.substring(0, 2));
+  const month = parseInt(front.substring(2, 4));
+  const day = parseInt(front.substring(4, 6));
+  
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  
+  // 월별 일수 체크
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  
+  // 윤년 계산 (1900년대, 2000년대 고려)
+  const genderCode = parseInt(back.charAt(0));
+  let fullYear: number;
+  
+  if (genderCode === 1 || genderCode === 2) {
+    fullYear = 1900 + year;
+  } else if (genderCode === 3 || genderCode === 4) {
+    fullYear = 2000 + year;
+  } else {
+    return false; // 유효하지 않은 성별 코드
+  }
+  
+  // 윤년 체크
+  const isLeapYear = (fullYear % 4 === 0 && fullYear % 100 !== 0) || (fullYear % 400 === 0);
+  if (month === 2 && isLeapYear) {
+    daysInMonth[1] = 29;
+  }
+  
+  if (day > daysInMonth[month - 1]) return false;
+  
+  // 체크섬 검증
+  const weights = [2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5];
+  const digits = (front + back.substring(0, 6)).split('').map(Number);
+  
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += digits[i] * weights[i];
+  }
+  
+  const checkDigit = (11 - (sum % 11)) % 10;
+  const lastDigit = parseInt(back.charAt(6));
+  
+  return checkDigit === lastDigit;
+}
+
 export class CreateEducationDto {
-  @ApiProperty({ description: 'School name', minLength: 1, maxLength: 100 })
+  @ApiPropertyOptional({ description: 'School name', maxLength: 100 })
+  @IsOptional()
   @IsString({ message: '학교명은 문자열이어야 합니다.' })
-  @IsNotEmpty({ message: '학교명은 필수 입력 항목입니다.' })
-  @Length(1, 100, { message: '학교명은 1자 이상 100자 이하여야 합니다.' })
-  school: string;
+  @Length(0, 100, { message: '학교명은 100자 이하여야 합니다.' })
+  school?: string;
 
-  @ApiProperty({
-    description: 'Major field of study',
-    minLength: 1,
-    maxLength: 100,
-  })
+  @ApiPropertyOptional({ description: 'Major field of study', maxLength: 100 })
+  @IsOptional()
   @IsString({ message: '전공은 문자열이어야 합니다.' })
-  @IsNotEmpty({ message: '전공은 필수 입력 항목입니다.' })
-  @Length(1, 100, { message: '전공은 1자 이상 100자 이하여야 합니다.' })
-  major: string;
+  @Length(0, 100, { message: '전공은 100자 이하여야 합니다.' })
+  major?: string;
 
-  @ApiProperty({ description: 'Degree type', minLength: 1, maxLength: 50 })
+  @ApiPropertyOptional({ description: 'Degree type', maxLength: 50 })
+  @IsOptional()
   @IsString({ message: '학위는 문자열이어야 합니다.' })
-  @IsNotEmpty({ message: '학위는 필수 입력 항목입니다.' })
-  @Length(1, 50, { message: '학위는 1자 이상 50자 이하여야 합니다.' })
-  degree: string;
+  @Length(0, 50, { message: '학위는 50자 이하여야 합니다.' })
+  degree?: string;
 
   @ApiPropertyOptional({ description: 'Start date (admission date)' })
   @IsDateString({}, { message: '입학일은 올바른 날짜 형식이어야 합니다.' })
@@ -54,23 +108,23 @@ export class CreateEducationDto {
 }
 
 export class CreateExperienceDto {
-  @ApiProperty({ description: 'Company name', minLength: 1, maxLength: 100 })
+  @ApiPropertyOptional({ description: 'Company name', maxLength: 100 })
+  @IsOptional()
   @IsString({ message: '회사명은 문자열이어야 합니다.' })
-  @IsNotEmpty({ message: '회사명은 필수 입력 항목입니다.' })
-  @Length(1, 100, { message: '회사명은 1자 이상 100자 이하여야 합니다.' })
-  company: string;
+  @Length(0, 100, { message: '회사명은 100자 이하여야 합니다.' })
+  company?: string;
 
-  @ApiProperty({ description: 'Department', minLength: 1, maxLength: 100 })
+  @ApiPropertyOptional({ description: 'Department', maxLength: 100 })
+  @IsOptional()
   @IsString({ message: '부서명은 문자열이어야 합니다.' })
-  @IsNotEmpty({ message: '부서명은 필수 입력 항목입니다.' })
-  @Length(1, 100, { message: '부서명은 1자 이상 100자 이하여야 합니다.' })
-  department: string;
+  @Length(0, 100, { message: '부서명은 100자 이하여야 합니다.' })
+  department?: string;
 
-  @ApiProperty({ description: 'Position title', minLength: 1, maxLength: 100 })
+  @ApiPropertyOptional({ description: 'Position title', maxLength: 100 })
+  @IsOptional()
   @IsString({ message: '직급은 문자열이어야 합니다.' })
-  @IsNotEmpty({ message: '직급은 필수 입력 항목입니다.' })
-  @Length(1, 100, { message: '직급은 1자 이상 100자 이하여야 합니다.' })
-  position: string;
+  @Length(0, 100, { message: '직급은 1자 이상 100자 이하여야 합니다.' })
+  position?: string;
 
   @ApiPropertyOptional({ description: 'Start date (join date)' })
   @IsDateString({}, { message: '입사일은 올바른 날짜 형식이어야 합니다.' })
@@ -117,11 +171,11 @@ export class CreateEmployeeDto {
   @Length(1, 50, { message: '직급은 1자 이상 50자 이하여야 합니다.' })
   position: string;
 
-  @ApiProperty({ description: 'Rank', minLength: 1, maxLength: 50 })
+  @ApiPropertyOptional({ description: 'Rank', maxLength: 50 })
+  @IsOptional()
   @IsString({ message: '직책은 문자열이어야 합니다.' })
-  @IsNotEmpty({ message: '직책은 필수 입력 항목입니다.' })
-  @Length(1, 50, { message: '직책은 1자 이상 50자 이하여야 합니다.' })
-  rank: string;
+  @Length(0, 50, { message: '직책은 50자 이하여야 합니다.' })
+  rank?: string;
 
   @ApiProperty({ description: 'Department', minLength: 1, maxLength: 50 })
   @IsString({ message: '부서는 문자열이어야 합니다.' })
@@ -149,12 +203,6 @@ export class CreateEmployeeDto {
   @IsOptional()
   profileImageUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Age', minimum: 18, maximum: 100 })
-  @IsOptional()
-  @IsNumber({}, { message: '나이는 숫자여야 합니다.' })
-  @Min(18, { message: '나이는 18세 이상이어야 합니다.' })
-  @Max(100, { message: '나이는 100세 이하여야 합니다.' })
-  age?: number;
 
   @ApiProperty({ description: 'Join date' })
   @IsDateString({}, { message: '입사일은 올바른 날짜 형식이어야 합니다.' })
@@ -184,6 +232,18 @@ export class CreateEmployeeDto {
   @Matches(/^(\d{6}-\d{7}|)$/, {
     message: '주민등록번호는 "123456-1234567" 형식이어야 합니다.',
   })
+  @ValidateBy(
+    {
+      name: 'isValidKoreanSSN',
+      validator: {
+        validate: (value: string) => {
+          if (!value || value.trim() === '') return true; // 선택사항이므로 빈 값 허용
+          return validateKoreanSSN(value);
+        },
+        defaultMessage: () => '유효하지 않은 주민등록번호입니다.',
+      },
+    },
+  )
   ssn?: string;
 
   @ApiPropertyOptional({ description: 'Bank name', maxLength: 50 })
@@ -215,11 +275,11 @@ export class CreateEmployeeDto {
     type: [CreateEducationDto],
     maxItems: 10,
   })
+  @IsOptional()
   @IsArray({ message: '학력 정보는 배열이어야 합니다.' })
   @ValidateNested({ each: true })
   @Type(() => CreateEducationDto)
   @ArrayMaxSize(10, { message: '학력 정보는 최대 10개까지 입력 가능합니다.' })
-  @IsOptional()
   education?: CreateEducationDto[];
 
   @ApiPropertyOptional({
@@ -227,10 +287,10 @@ export class CreateEmployeeDto {
     type: [CreateExperienceDto],
     maxItems: 20,
   })
+  @IsOptional()
   @IsArray({ message: '경력 정보는 배열이어야 합니다.' })
   @ValidateNested({ each: true })
   @Type(() => CreateExperienceDto)
   @ArrayMaxSize(20, { message: '경력 정보는 최대 20개까지 입력 가능합니다.' })
-  @IsOptional()
   experience?: CreateExperienceDto[];
 }

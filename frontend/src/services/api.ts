@@ -49,6 +49,22 @@ class ApiClient {
         this.setToken(null);
         window.location.href = '/login';
       }
+      
+      // 에러 응답 본문을 읽어서 더 상세한 정보 제공
+      try {
+        const errorData = await response.json();
+        if (errorData.message) {
+          // 배열인 경우 (유효성 검증 에러)
+          if (Array.isArray(errorData.message)) {
+            throw new Error(errorData.message.join(', '));
+          }
+          // 문자열인 경우
+          throw new Error(errorData.message);
+        }
+      } catch (parseError) {
+        // JSON 파싱 실패시 기본 에러
+      }
+      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 

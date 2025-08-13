@@ -74,7 +74,7 @@ import { CRModule } from './modules/cr/cr.module';
         ExchangeRate,
         EmployeeHRCost,
       ],
-      synchronize: process.env.NODE_ENV === 'development',
+      synchronize: true,
       ssl:
         process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     }),

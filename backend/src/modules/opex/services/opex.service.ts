@@ -130,7 +130,6 @@ export class OpexService {
       .getOne();
 
     if (!yearlyOpex) {
-      console.log(`[DEBUG] ${year}년 데이터가 없어서 초기화 생성`);
       yearlyOpex = await this.initializeYearlyOpex(year);
     } else if (!yearlyOpex.months || yearlyOpex.months.length < 12) {
       console.log(
@@ -368,7 +367,6 @@ export class OpexService {
     month: number,
     data: any,
   ): Promise<MonthlyOpex> {
-    console.log(`[DEBUG] updateMonthData 시작: ${year}년 ${month}월`);
 
     try {
       const yearlyOpex = await this.findByYear(year);
@@ -380,7 +378,6 @@ export class OpexService {
         );
       }
 
-      console.log(`[DEBUG] monthlyOpex found - ID: ${monthlyOpex.id}`);
 
       // 프론트엔드에서 전송된 모든 항목 수집
       const incomingItems = [
@@ -396,13 +393,11 @@ export class OpexService {
         (item) => item.category && item.category.trim() && item.amount > 0,
       );
 
-      console.log(`[DEBUG] 받은 유효한 항목 수: ${incomingItems.length}`);
 
       // 기존 항목 조회 후 삭제 (testDirectDelete와 동일한 패턴)
       const existingItems = await this.opexItemRepository.find({
         where: { monthlyOpex: { id: monthlyOpex.id } },
       });
-      console.log(`[DEBUG] 기존 항목 조회: ${existingItems.length}개`);
 
       if (existingItems.length > 0) {
         const deleteResult = await this.opexItemRepository.delete(
@@ -412,7 +407,6 @@ export class OpexService {
           `[DEBUG] 기존 항목 삭제 완료: ${deleteResult.affected || 0}개`,
         );
       } else {
-        console.log(`[DEBUG] 삭제할 기존 항목 없음`);
       }
 
       // 직원수 업데이트
@@ -441,13 +435,11 @@ export class OpexService {
         );
       }
 
-      console.log(`[DEBUG] 총 ${savedItems.length}개 항목 저장 완료`);
 
       // 즉시 검증: 실제 DB에 저장된 항목 수 확인
       const finalVerifyCount = await this.opexItemRepository.count({
         where: { monthlyOpex: { id: monthlyOpex.id } },
       });
-      console.log(`[DEBUG] 최종 검증 - 실제 DB 항목 수: ${finalVerifyCount}개`);
 
       // 직접 쿼리로 데이터 조회 (캐시 문제 우회)
       const finalItems = await this.opexItemRepository.find({
@@ -455,7 +447,6 @@ export class OpexService {
         order: { id: 'ASC' },
       });
 
-      console.log(`[DEBUG] 직접 조회 결과: ${finalItems.length}개 항목`);
       finalItems.forEach((item) => {
         console.log(
           `[DEBUG] - ID: ${item.id}, Category: ${item.category}, Amount: ${item.amount}`,
@@ -483,8 +474,9 @@ export class OpexService {
     month: number,
     dto: UpdateMonthDataDto,
   ): Promise<MonthlyOpex> {
-    console.log(`[DEBUG] updateMonthDataV2 시작: ${year}년 ${month}월`);
-    console.log(`[DEBUG] 받은 데이터:`, {
+    console.log('updateMonthDataV2 called with:', {
+      year,
+      month,
       indirectCount: dto.indirect?.length || 0,
       directCount: dto.direct?.length || 0,
       deleteIds: dto.deleteIds || [],
@@ -529,7 +521,6 @@ export class OpexService {
             monthlyOpex.employeeCount = actualEmployeeCount;
             employeeCountChanged = true;
           } else {
-            console.log(`[DEBUG] 직원수 변경 없음: ${actualEmployeeCount}명`);
           }
         } catch (error) {
           console.error(`[ERROR] 직원수 계산 실패, 기존값 유지:`, error);
@@ -544,7 +535,6 @@ export class OpexService {
         if (dto.deleteIds && dto.deleteIds.length > 0) {
           const validDeleteIds = dto.deleteIds.filter((id) => id > 0);
           if (validDeleteIds.length > 0) {
-            console.log(`[DEBUG] 삭제할 항목 ID: ${validDeleteIds.join(', ')}`);
             await manager.delete(OpexItem, validDeleteIds);
           }
         }
@@ -569,7 +559,6 @@ export class OpexService {
           })),
         ];
 
-        console.log(`[DEBUG] 처리할 항목 수: ${allItems.length}개`);
 
         // 6. 기존 항목별 최대 번호 확인 (새 항목 추가 시 사용)
         const existingIndirectItems = existingItems.filter(
@@ -644,9 +633,7 @@ export class OpexService {
         // 8. 저장 실행
         if (itemsToSave.length > 0) {
           await manager.save(OpexItem, itemsToSave);
-          console.log(`[DEBUG] ${itemsToSave.length}개 항목 저장 완료`);
         } else {
-          console.log(`[DEBUG] 저장할 항목 없음 (모든 항목이 동일)`);
         }
 
         // 9. 전체 변경사항 요약
@@ -656,7 +643,6 @@ export class OpexService {
           (dto.deleteIds?.length || 0);
 
         if (totalChanges === 0) {
-          console.log(`[DEBUG] 변경사항 없음 - 불필요한 DB 연산 최소화됨`);
         } else {
           console.log(
             `[DEBUG] 총 변경사항: 직원수 ${employeeCountChanged ? '변경' : '유지'}, 항목 ${itemsToSave.length}개 저장, ${dto.deleteIds?.length || 0}개 삭제`,
@@ -731,10 +717,8 @@ export class OpexService {
         // 2. 해당 월을 확정 상태로 변경
         monthlyOpex.confirmed = true;
         await manager.save(MonthlyOpex, monthlyOpex);
-        console.log(`[DEBUG] ${month}월 확정 상태 저장 완료`);
 
         // 3. 확정된 월의 데이터를 이후 달에 반영 (트랜잭션 내에서)
-        console.log(`[DEBUG] 미래 월 반영 프로세스 시작 (트랜잭션 내)`);
         console.log(
           `[DEBUG] 확정된 월 ${month}의 OPEX 항목 수: ${monthlyOpex.opexItems?.length || 0}`,
         );
@@ -753,7 +737,6 @@ export class OpexService {
           monthlyOpex,
           month,
         );
-        console.log(`[DEBUG] 미래 월 반영 프로세스 완료`);
 
         this.logger.log(`트랜잭션 커밋 준비 완료`);
 
@@ -802,13 +785,11 @@ export class OpexService {
       },
     });
 
-    console.log(`[DEBUG] 반영할 미래 월 수: ${futureMonths.length}`);
     console.log(
       `[DEBUG] 미래 월들: ${futureMonths.map((m) => m.month).join(', ')}`,
     );
 
     if (futureMonths.length === 0) {
-      console.log(`[DEBUG] 반영할 미래 월이 없습니다.`);
       return;
     }
 
@@ -854,7 +835,6 @@ export class OpexService {
     await manager.save(MonthlyOpex, futureMonths); // 직원수 업데이트
     const savedItems = await manager.save(OpexItem, allCopiedItems); // 모든 OPEX 항목 한번에 저장
 
-    console.log(`[DEBUG] Batch 저장 완료: ${savedItems.length}개 항목 저장`);
     console.log(
       `[DEBUG] 월별 항목 수:`,
       futureMonths
@@ -898,13 +878,11 @@ export class OpexService {
       },
     });
 
-    console.log(`[DEBUG] 반영할 미래 월 수: ${futureMonths.length}`);
     console.log(
       `[DEBUG] 미래 월들: ${futureMonths.map((m) => m.month).join(', ')}`,
     );
 
     for (const futureMonth of futureMonths) {
-      console.log(`[DEBUG] ${futureMonth.month}월에 데이터 반영 중...`);
 
       // 기존 OPEX 항목들 삭제 (쿼리 빌더 사용으로 더 확실하게)
       const deleteQuery = this.opexItemRepository
@@ -963,7 +941,6 @@ export class OpexService {
       );
     }
 
-    console.log(`[DEBUG] 확정 월 ${confirmedMonth} 데이터 반영 완료`);
   }
 
   async getYearlySummary(year: number): Promise<{
@@ -1169,7 +1146,6 @@ export class OpexService {
 
   // 테스트용 월별 데이터 생성 메서드
   async createTestMonthData(year: number, month: number) {
-    console.log(`[DEBUG] ${year}년 ${month}월 테스트 데이터 생성 시작`);
 
     // 먼저 해당 연도 YearlyOpex가 있는지 확인
     let yearlyOpex = await this.yearlyOpexRepository.findOne({
@@ -1178,7 +1154,6 @@ export class OpexService {
     });
 
     if (!yearlyOpex) {
-      console.log(`[DEBUG] ${year}년 데이터가 없어서 YearlyOpex 생성`);
       yearlyOpex = await this.initializeYearlyOpex(year);
     }
 
@@ -1192,7 +1167,6 @@ export class OpexService {
     });
 
     if (!monthlyOpex) {
-      console.log(`[DEBUG] ${month}월 데이터가 없어서 MonthlyOpex 생성`);
       monthlyOpex = this.monthlyOpexRepository.create({
         month,
         employeeCount: 10,
@@ -1208,7 +1182,6 @@ export class OpexService {
       await this.opexItemRepository.delete({
         monthlyOpex: { id: monthlyOpex.id },
       });
-      console.log(`[DEBUG] ${month}월 기존 항목 삭제 완료`);
     }
 
     // 테스트 데이터 생성
@@ -1285,7 +1258,6 @@ export class OpexService {
       .filter((item) => item.type === OpexType.DIRECT)
       .reduce((sum, item) => sum + item.amount, 0);
 
-    console.log(`[DEBUG] ${month}월 테스트 데이터 생성 완료:`);
     console.log(
       `[DEBUG] - Indirect: ${indirectTotal}원 (${updatedMonthlyOpex.opexItems.filter((item) => item.type === OpexType.INDIRECT).length}개 항목)`,
     );
@@ -1359,7 +1331,6 @@ export class OpexService {
 
   // 간단한 저장 테스트용 메서드
   async testSimpleSave(year: number, month: number): Promise<any> {
-    console.log(`[DEBUG] 간단한 저장 테스트: ${year}년 ${month}월`);
 
     const yearlyOpex = await this.findByYear(year);
     const monthlyOpex = yearlyOpex.months.find((m) => m.month === month);
@@ -1385,7 +1356,6 @@ export class OpexService {
 
     try {
       const savedItem = await this.opexItemRepository.save(newItem);
-      console.log(`[DEBUG] 간단한 저장 성공: ${savedItem.id}`);
 
       return {
         success: true,
@@ -1403,7 +1373,6 @@ export class OpexService {
 
   // 직접 삭제 테스트용 메서드
   async testDirectDelete(year: number, month: number): Promise<any> {
-    console.log(`[DEBUG] 직접 삭제 테스트: ${year}년 ${month}월`);
 
     const monthlyOpex = await this.monthlyOpexRepository.findOne({
       where: {
@@ -1418,7 +1387,6 @@ export class OpexService {
     }
 
     const itemsToDelete = monthlyOpex.opexItems;
-    console.log(`[DEBUG] 삭제할 항목 수: ${itemsToDelete.length}`);
     console.log(
       `[DEBUG] 삭제할 항목들:`,
       itemsToDelete.map((item) => ({ id: item.id, category: item.category })),
@@ -1432,13 +1400,11 @@ export class OpexService {
     const deleteResult = await this.opexItemRepository.delete(
       itemsToDelete.map((item) => item.id),
     );
-    console.log(`[DEBUG] 삭제 결과:`, deleteResult);
 
     // 삭제 후 검증
     const remainingItems = await this.opexItemRepository.find({
       where: { monthlyOpex: { id: monthlyOpex.id } },
     });
-    console.log(`[DEBUG] 삭제 후 남은 항목 수: ${remainingItems.length}`);
 
     return {
       deletedCount: deleteResult.affected || 0,
@@ -1449,7 +1415,6 @@ export class OpexService {
 
   // 전체 OPEX 데이터 초기화 (디버그용) - 완전 삭제 버전
   async clearAllOpexData(year: number): Promise<any> {
-    console.log(`[DEBUG] ${year}년 모든 OPEX 데이터 완전 삭제 시작`);
 
     // 해당 연도의 YearlyOpex 완전 삭제 (cascade로 모든 관련 데이터 삭제)
     const deleteResult = await this.yearlyOpexRepository.delete({ year });
@@ -1459,7 +1424,6 @@ export class OpexService {
 
     // 새로운 YearlyOpex 생성
     const newYearlyOpex = await this.initializeYearlyOpex(year);
-    console.log(`[DEBUG] ${year}년 새로운 YearlyOpex 생성 완료`);
 
     return {
       success: true,

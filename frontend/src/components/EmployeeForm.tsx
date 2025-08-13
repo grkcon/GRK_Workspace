@@ -4,6 +4,63 @@ import { Employee } from '../types/employee';
 import { Document, DocumentType } from '../types/document';
 import { documentApi } from '../services/documentApi';
 
+// 한국 주민등록번호 유효성 검증 함수
+function validateKoreanSSN(ssn: string): boolean {
+  if (!ssn || typeof ssn !== 'string') return false;
+  
+  // 형식 체크: 6자리-7자리
+  const ssnRegex = /^(\d{6})-(\d{7})$/;
+  const match = ssn.match(ssnRegex);
+  if (!match) return false;
+  
+  const [, front, back] = match;
+  
+  // 생년월일 유효성 검사
+  const year = parseInt(front.substring(0, 2));
+  const month = parseInt(front.substring(2, 4));
+  const day = parseInt(front.substring(4, 6));
+  
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  
+  // 월별 일수 체크
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  
+  // 윤년 계산 (1900년대, 2000년대 고려)
+  const genderCode = parseInt(back.charAt(0));
+  let fullYear: number;
+  
+  if (genderCode === 1 || genderCode === 2) {
+    fullYear = 1900 + year;
+  } else if (genderCode === 3 || genderCode === 4) {
+    fullYear = 2000 + year;
+  } else {
+    return false; // 유효하지 않은 성별 코드
+  }
+  
+  // 윤년 체크
+  const isLeapYear = (fullYear % 4 === 0 && fullYear % 100 !== 0) || (fullYear % 400 === 0);
+  if (month === 2 && isLeapYear) {
+    daysInMonth[1] = 29;
+  }
+  
+  if (day > daysInMonth[month - 1]) return false;
+  
+  // 체크섬 검증
+  const weights = [2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5];
+  const digits = (front + back.substring(0, 6)).split('').map(Number);
+  
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += digits[i] * weights[i];
+  }
+  
+  const checkDigit = (11 - (sum % 11)) % 10;
+  const lastDigit = parseInt(back.charAt(6));
+  
+  return checkDigit === lastDigit;
+}
+
 interface EmployeeFormProps {
   employee?: Employee;
   isEditing: boolean;
@@ -14,17 +71,17 @@ interface EmployeeFormProps {
 
 // 폼에서 사용하는 간단한 타입들
 export interface EducationFormData {
-  school: string;
-  major: string;
-  degree: string;
+  school?: string;
+  major?: string;
+  degree?: string;
   startDate?: string;
   graduationDate?: string;
 }
 
 export interface ExperienceFormData {
-  company: string;
-  department: string;
-  position: string;
+  company?: string;
+  department?: string;
+  position?: string;
   startDate?: string;
   endDate?: string;
   annualSalary?: string;
@@ -38,7 +95,6 @@ export interface EmployeeFormData {
   department: string;
   tel: string;
   email: string;
-  age?: number;
   joinDate: string;
   endDate?: string;
   monthlySalary?: string;
@@ -51,20 +107,20 @@ export interface EmployeeFormData {
   experience: ExperienceFormData[];
 }
 
-// 직급 리스트 (엑셀 HR_Cost 기준)
+// 직급 리스트 (높은 직급 → 낮은 직급 순서)
 const POSITION_OPTIONS = [
-  { value: 'EP', label: 'EP (Executive Partner)', multiplier: '350%' },
-  { value: 'Partner', label: 'Partner', multiplier: '350%' },
-  { value: 'Manager', label: 'Manager', multiplier: '50%' },
-  { value: 'PM', label: 'PM (Project Manager)', multiplier: '50%' },
-  { value: 'PR', label: 'PR (Project)', multiplier: '120%' },
-  { value: 'SBA', label: 'SBA (Senior Business Analyst)', multiplier: '100%' },
-  { value: 'BA', label: 'BA (Business Analyst)', multiplier: '100%' },
-  { value: 'ACC', label: 'ACC (Accountant)', multiplier: '100%' },
-  { value: 'Senior', label: 'Senior', multiplier: '100%' },
-  { value: 'Junior', label: 'Junior', multiplier: '70%' },
-  { value: '사원', label: '사원', multiplier: '70%' },
-  { value: '인턴', label: '인턴', multiplier: '70%' }
+  '대표이사',
+  '부장',
+  '차장',
+  '과장',
+  '대리',
+  'Principal',
+  'Manager',
+  'Senior Business Analyst',
+  'Business Analyst',
+  'Associate',
+  '사원',
+  'RA (인턴)'
 ];
 
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ 
@@ -108,7 +164,6 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
       department: '',
       tel: '',
       email: '',
-      age: undefined,
       joinDate: '',
       endDate: '',
       monthlySalary: '',
@@ -228,7 +283,6 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
         department: employee.department || '',
         tel: employee.tel || '',
         email: employee.email || '',
-        age: employee.age || undefined,
         joinDate: employee.joinDate ? new Date(employee.joinDate).toISOString().split('T')[0] : '',
         endDate: employee.endDate ? new Date(employee.endDate).toISOString().split('T')[0] : '',
         monthlySalary: employee.monthlySalary ? (employee.monthlySalary * 12).toLocaleString() : '',
@@ -237,21 +291,21 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
         bankName: employee.bankName || '',
         bankAccount: employee.bankAccount || '',
         consultantIntroduction: employee.consultantIntroduction || '',
-        education: employee.education?.map(edu => ({
+        education: (employee.education && Array.isArray(employee.education)) ? employee.education.map(edu => ({
           school: edu.school,
           major: edu.major,
           degree: edu.degree,
           startDate: edu.startDate ? new Date(edu.startDate).toISOString().split('T')[0] : '',
           graduationDate: edu.graduationDate ? new Date(edu.graduationDate).toISOString().split('T')[0] : ''
-        })) || [],
-        experience: employee.experience?.map(exp => ({
+        })) : [],
+        experience: (employee.experience && Array.isArray(employee.experience)) ? employee.experience.map(exp => ({
           company: exp.company,
           department: exp.department,
           position: exp.position,
           startDate: exp.startDate ? new Date(exp.startDate).toISOString().split('T')[0] : '',
           endDate: exp.endDate ? new Date(exp.endDate).toISOString().split('T')[0] : '',
           annualSalary: exp.annualSalary ? exp.annualSalary.toLocaleString() : ''
-        })) || []
+        })) : []
       });
 
       // 문서 목록 로드
@@ -269,8 +323,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
         department: '',
         tel: '',
         email: '',
-        age: undefined,
-        joinDate: '',
+          joinDate: '',
         endDate: '',
         monthlySalary: '',
         status: 'ACTIVE',
@@ -295,12 +348,14 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
       bankAccount: data.bankAccount?.trim() || undefined,
       consultantIntroduction: data.consultantIntroduction?.trim() || undefined,
       endDate: data.endDate?.trim() || undefined,
-      age: data.age || undefined,
       // monthlySalary는 문자열로 유지 (백엔드에서 처리)
       monthlySalary: data.monthlySalary?.trim() || undefined
     };
+
+    // age 필드가 있다면 제거 (혹시라도 포함된 경우 대비)
+    const { age, ...finalData } = cleanedData as any;
     
-    onSubmit(cleanedData);
+    onSubmit(finalData);
   };
 
   const addEducation = () => {
@@ -496,8 +551,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
                   >
                     <option value="">직급을 선택하세요</option>
                     {POSITION_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label} ({option.multiplier})
+                      <option key={option} value={option}>
+                        {option}
                       </option>
                     ))}
                   </select>
@@ -513,11 +568,6 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
                     readOnly
                     className={`${inputClass(false)} bg-slate-50 text-slate-600`}
                   />
-                  {watch('position') && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      HR Cost 비율: {POSITION_OPTIONS.find(opt => opt.value === watch('position'))?.multiplier || '100%'}
-                    </p>
-                  )}
                 </div>
               )}
             </div>
@@ -540,12 +590,10 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
             </div>
 
             <div>
-              <label className="block font-medium text-slate-600 mb-1">직책 *</label>
+              <label className="block font-medium text-slate-600 mb-1">직책</label>
               <input
                 type="text"
                 {...register('rank', {
-                  required: '직책은 필수 입력 항목입니다.',
-                  minLength: { value: 1, message: '직책은 최소 1자 이상이어야 합니다.' },
                   maxLength: { value: 50, message: '직책은 최대 50자 이하여야 합니다.' }
                 })}
                 readOnly={!isEditing}
@@ -569,29 +617,31 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
                 readOnly={!isEditing}
                 className={inputClass(!!errors.tel)}
                 placeholder="예: 010-1234-5678"
+                onInput={(e) => {
+                  if (isEditing) {
+                    const target = e.target as HTMLInputElement;
+                    // 숫자만 추출
+                    let value = target.value.replace(/[^\d]/g, '');
+                    
+                    // 길이에 따라 하이픈 추가
+                    if (value.length <= 3) {
+                      // 3자리 이하: 그대로
+                      target.value = value;
+                    } else if (value.length <= 7) {
+                      // 4-7자리: 010-1234 형태
+                      target.value = `${value.slice(0, 3)}-${value.slice(3)}`;
+                    } else {
+                      // 8자리 이상: 010-1234-5678 형태
+                      target.value = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+                    }
+                  }
+                }}
               />
               {errors.tel && (
                 <p className="mt-1 text-sm text-red-600">{errors.tel.message}</p>
               )}
             </div>
 
-            <div>
-              <label className="block font-medium text-slate-600 mb-1">나이</label>
-              <input
-                type="number"
-                {...register('age', {
-                  min: { value: 18, message: '나이는 18세 이상이어야 합니다.' },
-                  max: { value: 100, message: '나이는 100세 이하여야 합니다.' },
-                  valueAsNumber: true
-                })}
-                readOnly={!isEditing}
-                className={inputClass(!!errors.age)}
-                placeholder="예: 30"
-              />
-              {errors.age && (
-                <p className="mt-1 text-sm text-red-600">{errors.age.message}</p>
-              )}
-            </div>
 
             <div className="md:col-span-2">
               <label className="block font-medium text-slate-600 mb-1">이메일 주소 *</label>
@@ -617,12 +667,31 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
                   pattern: { 
                     value: /^\d{6}-\d{7}$/, 
                     message: '주민등록번호는 "123456-1234567" 형식이어야 합니다.' 
+                  },
+                  validate: (value) => {
+                    if (!value || value.trim() === '') return true; // 선택사항이므로 빈 값 허용
+                    return validateKoreanSSN(value) || '유효하지 않은 주민등록번호입니다.';
                   }
                 })}
                 readOnly={!isEditing}
                 className={inputClass(!!errors.ssn)}
                 placeholder="예: 900101-1234567"
                 maxLength={14}
+                onInput={(e) => {
+                  if (isEditing) {
+                    const target = e.target as HTMLInputElement;
+                    // 숫자만 추출
+                    let value = target.value.replace(/[^\d]/g, '');
+                    
+                    // 길이에 따라 하이픈 추가
+                    if (value.length <= 6) {
+                      target.value = value;
+                    } else {
+                      // 6자리 이후에 하이픈 추가: 123456-1234567
+                      target.value = `${value.slice(0, 6)}-${value.slice(6, 13)}`;
+                    }
+                  }
+                }}
               />
               {errors.ssn && (
                 <p className="mt-1 text-sm text-red-600">{errors.ssn.message}</p>
@@ -927,8 +996,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
                         >
                           <option value="">선택</option>
                           {POSITION_OPTIONS.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.value}
+                            <option key={option} value={option}>
+                              {option}
                             </option>
                           ))}
                         </select>

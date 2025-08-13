@@ -119,4 +119,50 @@ export const employeeApi = {
       hrCost: any;
     }>>(`/employees/hr-cost-all/${year}/${month}`);
   },
+
+  // 휴직/퇴사 관련 API
+  processLeaveRequest: (id: number, data: {
+    startDate: string;
+    returnDate: string;
+    reason: string;
+    payType: 'paid' | 'unpaid';
+    memo?: string;
+  }): Promise<Employee> => {
+    return apiClient.post<Employee>(`/employees/${id}/leave-request`, data);
+  },
+
+  processResignationRequest: (id: number, data: {
+    resignDate: string;
+    reason: string;
+    leaveAccrued: number;
+    leaveUsed: number;
+    leaveRemaining: number;
+    leaveAllowance: number;
+    severancePay: 'yes' | 'no';
+    memo?: string;
+  }): Promise<Employee> => {
+    return apiClient.post<Employee>(`/employees/${id}/resignation-request`, data);
+  },
+
+  processReturnFromLeave: (id: number): Promise<Employee> => {
+    return apiClient.post<Employee>(`/employees/${id}/return-from-leave`, {});
+  },
+
+  // 평가 관련 API
+  saveEvaluation: (id: number, data: {
+    industryInsight: number;
+    consultingSkill: number;
+    jobAttitude: number;
+    clientRelationship: number;
+    peopleManagementSkill: number;
+    companyFitCommitment: number;
+    evaluatedBy?: string;
+    feedback?: { [key: string]: string };
+  }): Promise<Employee> => {
+    return apiClient.post<Employee>(`/employees/${id}/evaluation`, data);
+  },
+
+  getEvaluation: (id: number): Promise<any> => {
+    return apiClient.get<any>(`/employees/${id}/evaluation`);
+  },
 };
