@@ -27,7 +27,9 @@ export class EmployeeService {
     // 사번 자동 생성 (제공되지 않은 경우)
     let empNo = createEmployeeDto.empNo;
     if (!empNo) {
-      empNo = await this.generateEmpNo();
+      // 입사일을 기준으로 사번 생성
+      const joinDate = new Date(createEmployeeDto.joinDate);
+      empNo = await this.generateEmpNo(joinDate);
       // 중복 체크 (안전장치)
       const existingEmployee = await this.employeeRepository.findOne({
         where: { empNo },
@@ -193,10 +195,11 @@ export class EmployeeService {
 
   /**
    * 사번 자동 생성 (YYYYNNN 형식)
-   * 예: 2025001, 2025002, ...
+   * 입사일 연도 기준으로 생성
+   * 예: 2023년 입사 → 2023001, 2023002, ...
    */
-  private async generateEmpNo(): Promise<string> {
-    const year = new Date().getFullYear();
+  private async generateEmpNo(joinDate: Date): Promise<string> {
+    const year = joinDate.getFullYear();
 
     // 해당 연도의 마지막 사번 조회 (삭제된 직원 포함)
     const lastEmployee = await this.employeeRepository

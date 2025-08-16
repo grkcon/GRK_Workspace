@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi, CurrentUser, AuthResponse } from '../services/authApi';
+import { authApi, CurrentUser } from '../services/authApi';
 
 // 권한 타입 정의
 export type UserRole = 'ADMIN' | 'MANAGER' | 'EMPLOYEE' | 'DEVELOPER';
@@ -24,8 +24,13 @@ const PAGE_PERMISSIONS: PagePermission[] = [
   { path: '/cr', allowedRoles: ['DEVELOPER', 'ADMIN', 'MANAGER'] },
 ];
 
-// 사용자 ID별 권한 매핑 (Google 로그인 ID 기준)
+// 사용자 ID별 권한 매핑
 const getUserRole = (email: string): UserRole => {
+  // admin 계정은 모든 권한
+  if (email === 'admin' || email === 'admin@admin.com') {
+    return 'DEVELOPER';
+  }
+  
   // sungbae는 개발자로 모든 권한
   if (email === 'sungbae@grkcon.com' || email.startsWith('sungbae')) {
     return 'DEVELOPER';
@@ -45,7 +50,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   userRole: UserRole | null;
-  googleLogin: (accessToken: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   hasPageAccess: (path: string) => boolean;
@@ -74,13 +78,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuth = async () => {
     try {
+      // SSR 안전성 체크
+      if (typeof window === 'undefined') {
+        setIsLoading(false);
+        return;
+      }
+
       const token = localStorage.getItem('accessToken');
       if (token) {
-        const currentUser = await authApi.getCurrentUser();
-        setUser(currentUser);
-        setIsAuthenticated(true);
-        const role = getUserRole(currentUser.email);
-        setUserRole(role);
+        // admin-token인 경우 간단 처리
+        if (token === 'admin-token') {
+          const adminUser: CurrentUser = {
+            id: 1,
+            email: 'admin',
+            name: 'Administrator',
+            role: 'ADMIN',
+            profilePicture: ''
+          };
+          setUser(adminUser);
+          setIsAuthenticated(true);
+          const role = getUserRole('admin');
+          setUserRole(role);
+        } else {
+          // 기존 토큰 처리 (사용하지 않음)
+          setUser(null);
+          setIsAuthenticated(false);
+          setUserRole(null);
+        }
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -96,13 +120,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const handleAuthSuccess = (response: AuthResponse) => {
-    setUser(response.user);
-    setIsAuthenticated(true);
-    const role = getUserRole(response.user.email);
-    setUserRole(role);
-    localStorage.setItem('user', JSON.stringify(response.user));
-  };
 
   // 권한 관련 함수들
   const hasPageAccess = (path: string): boolean => {
@@ -119,26 +136,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
   };
 
-  const googleLogin = async (accessToken: string) => {
-    try {
-      const response = await authApi.googleAuth({ accessToken });
-      handleAuthSuccess(response);
-    } catch (error) {
-      console.error('Google login failed:', error);
-      throw error;
-    }
-  };
 
   const logout = () => {
     authApi.logout();
     setUser(null);
     setIsAuthenticated(false);
     setUserRole(null);
-    // Google 세션도 정리 (계정 선택 강제)
-    if ((window as any).google) {
-      (window as any).google.accounts.id.disableAutoSelect();
+    // SSR 안전성 체크
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      window.location.href = '/login';
     }
-    window.location.href = '/';
   };
 
   return (
@@ -148,7 +156,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAuthenticated,
         isLoading,
         userRole,
-        googleLogin,
         logout,
         checkAuth,
         hasPageAccess,
